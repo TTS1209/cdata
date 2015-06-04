@@ -1,0 +1,59 @@
+from cdata.struct import Struct, StructInstance
+
+from cdata.primitive import char, unsigned_char
+
+from cdata.endianness import Endianness
+
+def test_struct():
+    struct_test = Struct("test",
+                         ("a", char),
+                         ("b", unsigned_char))
+    
+    # Check the type looks sensible (more fully tested by the ComplexType tests
+    assert struct_test.name == "struct test"
+    assert struct_test.native == False
+    assert struct_test.prototype == "struct test;"
+    assert struct_test.definition == ("struct test {\n"
+                                      "    char a;\n"
+                                      "    unsigned char b;\n"
+                                      "};")
+    assert struct_test.declare() == ("struct test")
+    assert struct_test.declare("magic") == ("struct test magic")
+    assert list(struct_test.iter_types()) == [char, unsigned_char, struct_test]
+    assert repr(struct_test) == "<Struct: struct test>"
+    
+    # Check the instances look sensible (again, the ComplexTypeInstance base
+    # class is more fully tested elsewhere)
+    t = struct_test(char(b"J"), unsigned_char(255))
+    assert isinstance(t, StructInstance)
+    assert t.a.value == b"J"
+    assert t.b.value == 255
+    assert t.data_type == struct_test
+    assert t.size == 2
+    assert t.literal == ("(struct test){\n"
+                         "    'J',\n"
+                         "    255\n"
+                         "}")
+    assert str(t) == "{a: b'J', b: 255}"
+    assert repr(t) == "<struct test: {a: b'J', b: 255}>"
+    
+    # Should be able to change the address and change all members addresses too
+    assert t.address is None
+    t.address = 0x1000
+    assert t.a.address == 0x1000
+    assert t.b.address == 0x1001
+    t.address = None
+    assert t.a.address is None
+    assert t.b.address is None
+    
+    # Packing should work and, because both struct elements are bytes, the
+    # ordering should not be changed by endianness.
+    for endianness in Endianness:
+        assert t.pack(endianness) == b"J\xFF"
+    
+    # Unpacking should do the same
+    for endianness in Endianness:
+        t = struct_test()
+        t.unpack(b"H\xAA", endianness)
+        assert t.a.value == b"H"
+        assert t.b.value == 0xAA
