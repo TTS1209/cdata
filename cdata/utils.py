@@ -23,3 +23,12 @@ def indent(string, indentation="    ", indent_empty_lines=False):
                                     else ""),
                                    line)
                      for line in string.split("\n"))
+
+
+class EmptyIterable(object):
+    """An object which when iterated over, iterates over the empty list."""
+    
+    def __iter__(self):
+        return iter([])
+
+empty_iterable = EmptyIterable()

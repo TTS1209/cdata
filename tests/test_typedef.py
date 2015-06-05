@@ -1,5 +1,7 @@
 import pytest
 
+from mock import Mock
+
 from cdata.typedef import Typedef, TypedefInstance
 
 from cdata.primitive import char
@@ -40,6 +42,20 @@ def test_typedef():
     # Check the instance remains of the correct type after unpacking
     c.unpack(b"\x12")
     assert c.value == b"\x12"
+    
+    # Check that if _parents is set, the calls are passed through correctly and
+    # that they give the typedef's instance, not the underlying base type.
+    container = Mock()
+    c._parents.append(container)
+    c.value = b"J"
+    c.address = 0xDEADBEEF
+    assert len(container._child_value_changed.call_args_list) == 1
+    child = container._child_value_changed.call_args_list[0][0][0]
+    assert child is c
+    
+    assert len(container._child_address_changed.call_args_list) == 1
+    child = container._child_address_changed.call_args_list[0][0][0]
+    assert child is c
 
 
 def test_multiple_typedef_instances():

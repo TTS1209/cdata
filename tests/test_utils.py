@@ -1,4 +1,4 @@
-from cdata.utils import indent
+from cdata.utils import indent, empty_iterable
 
 
 def test_indent():
@@ -36,3 +36,8 @@ def test_indent():
                   indent_empty_lines=True) == ("    Hello, World!\n"
                                                "    \n"
                                                "    How are you?")
+
+def test_empty_iterable():
+    # The empty iterable should work multiple times!
+    for _ in range(10):
+        assert list(empty_iterable) == []

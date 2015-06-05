@@ -1,5 +1,7 @@
 import pytest
 
+from mock import Mock
+
 from cdata import primitive
 
 from cdata.endianness import Endianness
@@ -11,7 +13,8 @@ class TestPrimitive(object):
     def test_default_args(self):
         """Ensure that the primitive data type applies its arguments
         correctly."""
-        test_t = primitive.Primitive("test_t", "B", default_value=123)
+        test_t = primitive.Primitive("test_t", "B", cast=(lambda v: v),
+                                     default_value=123)
         assert test_t.name == "test_t"
         assert test_t.native == False
         assert test_t.prototype == ""
@@ -36,9 +39,17 @@ class TestPrimitive(object):
         assert str(inst) == "171"
         assert repr(inst) == "<test_t: 171>"
     
+    def test_cast(self):
+        """Ensure the cast argument is used."""
+        test_t = primitive.Primitive("test_t", "B", default_value=0,
+                                     cast=(lambda v: v + 1))
+        inst = test_t(123)
+        assert inst.value == 124  # 123 + 1 due to cast
+    
     def test_to_literal(self):
         """Ensure the to_literal argument is used."""
         test_t = primitive.Primitive("test_t", "B", default_value=123,
+                                     cast=(lambda v: v),
                                      to_literal=(lambda v: "hi {}".format(v)))
         inst = test_t()
         assert inst.literal == "hi 123"
@@ -47,8 +58,49 @@ class TestPrimitive(object):
     def test_native(self, native):
         """Ensure the native argument is used."""
         test_t = primitive.Primitive("test_t", "B", default_value=123,
+                                     cast=(lambda v: v),
                                      native=native)
         assert test_t.native == native
+    
+    def test_container(self):
+        """Ensure any container is called whenever the value changes."""
+        test_t = primitive.Primitive("test_t", "B", default_value=123,
+                                     cast=(lambda v: v))
+        inst = test_t()
+        
+        container = Mock()
+        inst._parents.append(container)
+        
+        # Reading the address should not call the callback
+        inst.address
+        assert not container._child_address_changed.called
+        
+        # Changing the address should call the callback
+        inst.address = 0xDEADBEEF
+        container._child_address_changed.assert_called_once_with(inst)
+        container._child_address_changed.reset_mock()
+        
+        inst.address = None
+        container._child_address_changed.assert_called_once_with(inst)
+        container._child_address_changed.reset_mock()
+        
+        # Reading the value should do nothing
+        inst.value
+        assert not container._child_value_changed.called
+        
+        # Packing the value should do nothing
+        inst.pack()
+        assert not container._child_value_changed.called
+        
+        # Setting the value should call the callback
+        inst.value = 0
+        container._child_value_changed.assert_called_once_with(inst)
+        container._child_value_changed.reset_mock()
+        
+        # Unpacking the value should call the callback
+        inst.unpack(b"\xFF")
+        container._child_value_changed.assert_called_once_with(inst)
+        container._child_value_changed.reset_mock()
 
 
 class TestStandardTypes(object):
@@ -79,6 +131,9 @@ class TestStandardTypes(object):
         assert primitive.char(b"a").value == b"a"
         assert primitive.char(b"\x00").value == b"\x00"
         assert primitive.char(b"\xFF").value == b"\xFF"
+        
+        # Should be able to set from integers too
+        assert primitive.char(0xFF).value == b"\xFF"
         
         # Test C literal representation
         assert primitive.char(b"a").literal == "'a'"
@@ -185,12 +240,15 @@ class TestStandardTypes(object):
         assert i.value == sum((n * 2) << n for n in range(0, n_bits, 8))
         
         
-        # Test setting values
+        # Test setting values also casts them appropriately
         big_positive = (1 << (n_bits - 1)) - 1
         big_negative = -1 << (n_bits - 1)
         big_negative_w = big_negative & ((1 << n_bits) - 1)
         assert data_type(big_positive).value == big_positive
-        assert data_type(big_negative).value == big_negative
+        if signed:
+            assert data_type(big_negative).value == big_negative
+        else:
+            assert data_type(big_negative).value == big_negative_w
         
         # Test C literal representation
         assert data_type(big_positive).literal == str(big_positive)

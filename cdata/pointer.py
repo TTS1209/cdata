@@ -32,6 +32,7 @@ class Pointer(DataType):
             The number of bits in the pointer address. Default: 32.
         """
         self.base_type = base_type
+        self.pointer_size = pointer_size
         
         # Check the pointer size is supported
         self._struct_format = Pointer.POINTER_TYPES.get(
@@ -82,7 +83,7 @@ class PointerInstance(Instance):
         self._deref = None
         
         if isinstance(value_or_address, integer_types):
-            self.value = value_or_address
+            self.ref = value_or_address
         else:
             # Got a value to be dereferenced (or None)
             self.deref = value_or_address
@@ -94,10 +95,40 @@ class PointerInstance(Instance):
         return self._deref
     
     
+    def _child_value_changed(self, child):
+        """We don't care if the referenced instance's value changes, it doesn't
+        effect the pointer's value or address."""
+        pass
+    
+    
+    def _child_address_changed(self, child):
+        """When the child's address changes, this pointer's value implicitly
+        changes too."""
+        # If the address is out of range, fail
+        mask = (1 << self.data_type.pointer_size) - 1
+        if child.address & ~mask:
+            raise ValueError(
+                "Address 0x{:X} of {} out of range of pointer {}".format(
+                    child.address,
+                    repr(child),
+                    repr(self)))
+        
+        # If the child's address has become zero, that makes the pointer NULL
+        # and so we must throw away our reference to the child.
+        if child.address == 0:
+            # Note that this assignment implicitly calls self._value_changed.
+            self.deref = None
+        else:
+            self._value_changed()
+    
+    
     @deref.setter
-    def deref(self, value):
+    def deref(self, instance):
         """Set the target of this pointer to an appropriate Instance or None to
         set the pointer to NULL.
+        
+        Note: If the passed instance's address is 0, the result is the same as
+        passing None (i.e. the pointer is marked NULL).
         
         Raises
         ------
@@ -105,47 +136,66 @@ class PointerInstance(Instance):
             If the type of instance provided is not the type supported by this
             pointer.
         """
-        if value is None:
+        if instance is None or instance.address == 0:
+            # Unregister as a parent of the previous instance.
+            if self._deref is not None:
+                self._deref._parents.remove(self)
+            
             # Set to NULL pointer
             self._deref = None
-        elif hasattr(value, "data_type") and (value.data_type ==
-                                              self.data_type.base_type):
-            # The value is of the correct type, keep it
-            self._deref = value
+        elif hasattr(instance, "data_type") and (instance.data_type ==
+                                                 self.data_type.base_type):
+            # Unregister as a parent of the previous instance.
+            if self._deref is not None:
+                self._deref._parents.remove(self)
+            
+            # The instance is of the correct type, keep it
+            self._deref = instance
+            self._deref._parents.append(self)
         else:
-            # The value is not of an appropriate type. Fail.
+            # The instance is not of an appropriate type. Fail.
             raise TypeError("pointer is for type {} but got {}".format(
-                repr(self.data_type.base_type), repr(value)))
+                repr(self.data_type.base_type), repr(instance)))
+        
+        # The address may have changed as a result of the referenced value
+        # changing.
+        self._value_changed()
     
     @property
-    def value(self):
+    def ref(self):
         """Get the address this pointer points at."""
         if self.deref is None:
             return 0
         else:
             return self.deref.address
     
-    @value.setter
-    def value(self, address):
+    @ref.setter
+    def ref(self, address):
         """Change the address that this pointer points at.
         
         If changed to 0, NULL out the pointer.
         
-        The pointer address changes create a new (default) instance of the
-        referenced type and set its address field to the address supplied.
+        If the pointer is currently NULL, create a new (default) instance with
+        the specified address.
         
-        If the address has not changed, keep the old instance.
+        Otherwise, change the address of the current instance.
         """
+        # Check the address is within the allowable range
+        if address & ~((1 << self.data_type.pointer_size) - 1):
+            raise ValueError(
+                "Address 0x{:X} out of range of pointer {}".format(
+                    address, repr(self)))
+        
         if address == 0:
             # Passed a NULL address
             self.deref = None
         else:
-            # Got an address, if changed, create a new value of that type and
-            # assign it the supplied address. If unchanged, keep the existing
-            # value.
-            if self.deref is None or self.deref.address != address:
+            # Create a new instance if the pointer was NULL
+            if self.deref is None:
                 self.deref = self.data_type.base_type()
-                self.deref.address = address
+            
+            # Set the address of the pointed-to instance accordingly
+            self.deref.address = address
     
     @property
     def size(self):
@@ -170,9 +220,8 @@ class PointerInstance(Instance):
             endianness.value + self.data_type._struct_format, address)
     
     def unpack(self, data, endianness=Endianness.little):
-        address = struct.unpack(
+        self.ref = struct.unpack(
             endianness.value + self.data_type._struct_format, data)[0]
-        self.value = address
     
     def __str__(self):
         if self.deref is None:
@@ -184,7 +233,7 @@ class PointerInstance(Instance):
         if _generated is None:
             _generated = set()
         
-        # This instance references the value being pointed at (unless NULL).
+        # This instance references the instance being pointed at (unless NULL).
         if self not in _generated and self.deref is not None:
             yield self.deref
             

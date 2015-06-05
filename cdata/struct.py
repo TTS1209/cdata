@@ -22,6 +22,8 @@ class StructInstance(ComplexTypeInstance):
     
     def __init__(self, *args, **kwargs):
         super(StructInstance, self).__init__(*args, **kwargs)
+        # This will cause any child instances to have their addresses reset
+        self.address = None
     
     @property
     def address(self):
@@ -44,6 +46,9 @@ class StructInstance(ComplexTypeInstance):
             # The address may have been changed to None
             if address is not None:
                 address += instance.size
+        
+        # Notify any containers
+        self._address_changed()
     
     @property
     def size(self):
@@ -59,3 +64,32 @@ class StructInstance(ComplexTypeInstance):
         for instance in itervalues(self._member_instances):
             this_data, data = data[:instance.size], data[instance.size:]
             instance.unpack(this_data, endianness)
+    
+    def _child_address_changed(self, child):
+        """When a child's address is changed, thrown an exception if it is
+        inconsistent."""
+        address = self.address
+        
+        # Find the child member in the struct (while calculating the appropriate
+        # address along the way)
+        for instance in itervalues(self._member_instances):
+            if instance is child:
+                if instance.address != address:
+                    # Fix the address before throwing the exception
+                    instance.address = address
+                    raise ValueError("The address of {} is defined by its "
+                                     "containing struct, {}, as {}".format(
+                                         repr(child), repr(self), address))
+                else:
+                    # The child's address is consistent with what it should be
+                    return
+            
+            # Note that the address may be None in which case it can't be
+            # incremented.
+            if address is not None:
+                address += instance.size
+        
+        # If we got here, the child was not a member of the struct which means
+        # there has been a bug somewhere.
+        assert False, (  # pragma: no cover
+            "Child is not a member of this struct. This is a bug.")

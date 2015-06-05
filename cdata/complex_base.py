@@ -180,8 +180,9 @@ class ComplexTypeInstance(Instance):
                 # Actually set the member's value
                 setattr(self, name, instance)
         
-        # Populate any undefined members with new instances
-        for name, instance in iteritems(self._member_instances):
+        # Populate any undefined members with new instances (note that the
+        # iterator must be copied since we may mutate the dictionary)
+        for name, instance in list(iteritems(self._member_instances)):
             if instance is None:
                 data_type = self.data_type._members[name]
                 
@@ -208,7 +209,15 @@ class ComplexTypeInstance(Instance):
         This function will always be called with a valid member name and
         instance type.
         """
+        # If replacing an existing member, record that we are no-longer its
+        # parent.
+        if self._member_instances.get(name, None) is not None:
+            self._member_instances[name]._parents.remove(self)
+        
         self._member_instances[name] = instance
+        instance._parents.append(self)
+        
+        self._value_changed()
     
     def __getattr__(self, name):
         """Handles reads of member instances."""
@@ -254,3 +263,7 @@ class ComplexTypeInstance(Instance):
             ", ".join("{}: {}".format(name, str(instance))
                       for name, instance
                       in iteritems(self._member_instances)))
+    
+    def _child_value_changed(self, child):
+        # If a member changes, this complex type by definition is also changed.
+        self._value_changed()

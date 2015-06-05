@@ -1,5 +1,7 @@
 import pytest
 
+from mock import Mock
+
 from six import itervalues
 
 from cdata.primitive import char, unsigned_char
@@ -24,15 +26,6 @@ class FooInstance(ComplexTypeInstance):
     """An instance of the above example type."""
     
     @property
-    def address(self):
-        return self._address
-    
-    @address.setter
-    def address(self, address):
-        # Just make a decorator which behaves like a variable
-        self._address = address
-    
-    @property
     def size(self):
         return 123
     
@@ -40,6 +33,10 @@ class FooInstance(ComplexTypeInstance):
         return b"foo"
     
     def unpack(self, data, endianness=Endianness.little):
+        pass
+    
+    def _child_address_changed(self, child):
+        # Just do nothing
         pass
 
 def test_empty():
@@ -299,3 +296,40 @@ def test_nested():
     # And again but this time with the values given positionally
     with pytest.raises(ValueError):
         my_foo(char(), anon_foo(), b__ba=char())
+
+def test_container():
+    # Test that the object forwards value change events from all members, but
+    # not members' address changes.
+    my_foo = Foo("my_foo",
+                 ("a", char),
+                 ("b", unsigned_char))
+    
+    f = my_foo()
+    container = Mock()
+    f._parents.append(container)
+    
+    # Changing the children should cause events
+    f.a.value = b"a"
+    container._child_value_changed.assert_called_once_with(f)
+    container._child_value_changed.reset_mock()
+    f.b.value = 123
+    container._child_value_changed.assert_called_once_with(f)
+    container._child_value_changed.reset_mock()
+    
+    # Changing an instance should cause events too
+    old_a = f.a
+    f.a = char(b"J")
+    container._child_value_changed.assert_called_once_with(f)
+    container._child_value_changed.reset_mock()
+    
+    # ...and should have stopped us responding to the old instance
+    old_a.value = b"X"
+    assert not container._child_value_changed.called
+    
+    # Changing child addresses should be ignored
+    f.a.address = 0xDEADBEEF
+    assert not container._child_address_changed.called
+    
+    # Changing the main address should cause a callback
+    f.address = 0xDEADBEEF
+    container._child_address_changed.assert_called_once_with(f)

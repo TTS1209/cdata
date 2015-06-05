@@ -1,9 +1,11 @@
 """The base classes for CData types."""
 
 
-from .exceptions import PointerToUndefinedMemoryAddress
+from cdata.exceptions import PointerToUndefinedMemoryAddress
 
-from .endianness import Endianness
+from cdata.endianness import Endianness
+
+from cdata.utils import empty_iterable
 
 
 class DataType(object):
@@ -121,6 +123,20 @@ class DataType(object):
 class Instance(object):
     """The base-class for all CData type instances.
     
+    Instance implementers should call :py:meth:`._value_changed` whenever the
+    instance's value changes and :py:meth:`._address_changed` whenever the
+    address changes.
+    
+    Implementations of container (e.g. struct) and reference (e.g. pointer)
+    types should implement :py:meth:`._child_value_changed` and
+    :py:meth:`._child_address_changed`. Note that the supplied "address" is a
+    property which automatically calls the :py:meth:`._child_address_changed`
+    method when the address is set.
+    
+    Container and reference instances should add themselves to the instance._parents list
+    attribute of any direct children. They should remove themselves when they
+    nolonger contain/refer to the specified instance.
+    
     Attributes
     ----------
     data_type : :py:class:`DataType`
@@ -131,6 +147,12 @@ class Instance(object):
         The size (in bytes) of the C representation of this instance.
     literal : str
         A C-literal which has the same value as this instance.
+    _parents : [:py:class:`Instance`, ...]
+        For internal use. A list of all instances which are parents to this
+        node. Used by the :py:meth:`._address_changed` and
+        :py:meth:`._value_changed` methods to call all parents'
+        :py:meth:`._child_value_changed` and :py:meth:`._child_address_changed`
+        methods.
     """
     
     # Placed here so that these names appear in the dir() of this class to allow
@@ -139,12 +161,25 @@ class Instance(object):
     # an Instance object and therefore it is important that any names which are
     # reserved are known.
     data_type = None
-    address = None
+    _address = None
+    _parents = empty_iterable
     
     def __init__(self, data_type):
         """Create a new instance of the specified type."""
         self.data_type = data_type
         self.address = None
+        self._parents = []
+    
+    @property
+    def address(self):
+        """Get the address of this instance in memory (or None if unknown)."""
+        return self._address
+    
+    @address.setter
+    def address(self, address):
+        """Set the address of this instance in memory (or None if unknown)."""
+        self._address = address
+        self._address_changed()
     
     @property
     def size(self):
@@ -222,3 +257,21 @@ class Instance(object):
     def __repr__(self):
         return "<{}: {}>".format(self.data_type.name,
                                  str(self))
+    
+    def _value_changed(self):
+        """To be called when an instances' value is changed."""
+        for p in self._parents:
+            p._child_value_changed(self)
+    
+    def _address_changed(self):
+        """To be called when an instances' address is changed."""
+        for p in self._parents:
+            p._child_address_changed(self)
+    
+    def _child_value_changed(self, child):
+        """Called for containers when a child's value changes."""
+        raise NotImplementedError()
+    
+    def _child_address_changed(self, child):
+        """Called for containers when a child's value changes."""
+        raise NotImplementedError()

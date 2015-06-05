@@ -41,11 +41,21 @@ class TypedefInstance(Instance):
     
     def __init__(self, typedef, *args, **kwargs):
         super(TypedefInstance, self).__init__(typedef)
+        
+        # We act like a container since when reporting changes, the reported
+        # instance must be the typedef instance and not the base instance.
+        self._base_instance._parents.append(self)
     
     @property
     def literal(self):
         return "({}){}".format(self.data_type.name,
                                self._base_instance.literal)
+    
+    def _child_value_changed(self, child):
+        self._value_changed()
+    
+    def _child_address_changed(self, child):
+        self._address_changed()
     
     # A list of members of this method which this instance overrides (i.e. which
     # __getattribute__ and __setattr__ shouldn't intercept).

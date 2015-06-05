@@ -1,5 +1,7 @@
 import pytest
 
+from mock import Mock
+
 from cdata.endianness import Endianness
 
 from cdata.pointer import Pointer, PointerInstance
@@ -32,7 +34,7 @@ def test_null():
 
     # Check that the pointer defaults to being NULL
     c = char_p()
-    assert c.value == 0
+    assert c.ref == 0
     assert c.deref is None
     
     # Check the standard features work when NULL.
@@ -46,13 +48,31 @@ def test_null():
     
     # Check that assigning an address of 0 produces a null pointer too
     c = char_p(0)
-    assert c.value == 0
+    assert c.ref == 0
+    assert c.deref is None
+    assert c.pack() == b"\x00\x00\x00\x00"
+    
+    # Check that setting the pointer to an instance with address 0 sets the
+    # pointer to Null too.
+    my_char = char()
+    my_char.address = 0
+    c = char_p(my_char)
+    assert c.ref == 0
+    assert c.deref is None
+    assert c.pack() == b"\x00\x00\x00\x00"
+    
+    # Check that changing a child's address to 0 results in a NULL pointer
+    my_char = char()
+    c = char_p(my_char)
+    assert c.deref is my_char
+    c.deref.address = 0
+    assert c.ref == 0
     assert c.deref is None
     assert c.pack() == b"\x00\x00\x00\x00"
     
     # Check that unpacking a NULL pointer produces a null
     c.unpack(b"\x00\x00\x00\x00")
-    assert c.value == 0
+    assert c.ref == 0
     assert c.deref is None
     assert c.pack() == b"\x00\x00\x00\x00"
 
@@ -62,7 +82,7 @@ def test_not_null():
     
     # Should get a default character instance if we pass in a non-0 address
     c = char_p(0xDEADBEEF)
-    assert c.value == 0xDEADBEEF
+    assert c.ref == 0xDEADBEEF
     assert c.deref is not None
     assert c.deref.data_type is char
     assert c.deref.value == char().value
@@ -79,20 +99,42 @@ def test_not_null():
     assert str(c) == "b'J'"
     assert repr(c) == "<char*: b'J'>"
     
+    # If a NULL pointer is given a new Non-NULL address (either manually or by
+    # unpacking), a new default instance should be created.
+    c = char_p()
+    assert c.ref == 0
+    assert c.deref is None
+    c.ref = 0xDEADBEEF
+    assert c.ref == 0xDEADBEEF
+    assert c.deref is not None
+    assert c.deref.value == b"\0"
+    assert c.deref.address == 0xDEADBEEF
+    
+    c = char_p()
+    assert c.ref == 0
+    assert c.deref is None
+    c.unpack(b"\xFF\xFF\xFF\xFF")
+    assert c.ref == 0xFFFFFFFF
+    assert c.deref is not None
+    assert c.deref.value == b"\0"
+    assert c.deref.address == 0xFFFFFFFF
+    
     # If we don't change the pointer address, the underlying character instance
     # referenced should not be touched
     referenced_char_inst = c.deref
+    referenced_char_inst.value = b"J"
     c.unpack(b"\xEF\xBE\xAD\xDE")
-    assert c.value == 0xDEADBEEF
+    assert c.ref == 0xDEADBEEF
     assert c.deref is referenced_char_inst
     
     # If we do change the pointer address, the underlying character instance
-    # referenced should be replaced with a new default character instance.
+    # should have its address changed.
     c.unpack(b"\x78\x56\x34\x12")
-    assert c.value == 0x12345678
-    assert c.deref is not referenced_char_inst
+    assert c.ref == 0x12345678
+    assert c.deref is referenced_char_inst
     assert c.deref is not None
-    assert c.deref.value == b"\0"
+    assert c.deref.address == 0x12345678
+    assert c.deref.value == b"J"
 
 @pytest.mark.parametrize("n_bits", [8, 16, 32, 64])
 def test_lengths(n_bits):
@@ -101,6 +143,21 @@ def test_lengths(n_bits):
     
     char_p = Pointer(char, n_bits)
     address = sum((n + 1) << n for n in range(0, n_bits, 8))
+    
+    # Addresses should fail out of the allowed range...
+    for bad_address in [-1, 1 << n_bits, address | (1 << n_bits)]:
+        # ...when set by constructor...
+        with pytest.raises(ValueError):
+            char_p(bad_address)
+        
+        # ...when set by ref...
+        c = char_p(char())
+        with pytest.raises(ValueError):
+            c.ref = bad_address
+        
+        # ...when set by the child's address field.
+        with pytest.raises(ValueError):
+            c.deref.address = bad_address
     
     c = char_p(address)
     referenced_char_inst = c.deref
@@ -135,7 +192,7 @@ def test_pack_unknown_address():
     # fail.
     char_p = Pointer(char)
     c = char_p(char())
-    assert c.value is None
+    assert c.ref is None
     with pytest.raises(PointerToUndefinedMemoryAddress):
         c.pack()
 
@@ -175,3 +232,70 @@ def test_double_pointer():
     
     # Should recursively list references
     assert list(c.iter_references()) == [c.deref, c.deref.deref]
+
+
+def test_parent():
+    # Make sure parent container/reference types get called when appropriate.
+    char_p = Pointer(char)
+    c = char_p(char())
+    
+    container = Mock()
+    c._parents.append(container)
+    
+    # Should not get informed on pointed-to value changes
+    c.deref.value = b"J"
+    assert not container._child_value_changed.mock_calls
+    assert not container._child_address_changed.mock_calls
+    
+    # Should get informed when the pointer's address is changed
+    c.ref = 0xDEADBEEF
+    container._child_value_changed.assert_called_once_with(c)
+    container._child_value_changed.reset_mock()
+    assert not container._child_address_changed.mock_calls
+    
+    # Should get informed when the child's address changes
+    c.deref.address = 0x12345678
+    container._child_value_changed.assert_called_once_with(c)
+    container._child_value_changed.reset_mock()
+    assert not container._child_address_changed.mock_calls
+    
+    # Should get informed when child gets nulled-out
+    c.ref = 0
+    container._child_value_changed.assert_called_once_with(c)
+    container._child_value_changed.reset_mock()
+    assert not container._child_address_changed.mock_calls
+    
+    # Should get informed when child gets swapped
+    c.deref = char()
+    container._child_value_changed.assert_called_once_with(c)
+    container._child_value_changed.reset_mock()
+    assert not container._child_address_changed.mock_calls
+    
+    # Should get informed when child gets indirectly nulled-out
+    c.deref.address = 0
+    container._child_value_changed.assert_called_once_with(c)
+    container._child_value_changed.reset_mock()
+    assert not container._child_address_changed.mock_calls
+    
+    # Nulling out a pointer should stop its instance causing change
+    # notifications.
+    my_char = char()
+    c.deref = my_char
+    container._child_value_changed.assert_called_once_with(c)
+    container._child_value_changed.reset_mock()
+    assert not container._child_address_changed.mock_calls
+    my_char.address = 0x1234
+    container._child_value_changed.assert_called_once_with(c)
+    container._child_value_changed.reset_mock()
+    assert not container._child_address_changed.mock_calls
+    my_char.address = 0
+    container._child_value_changed.assert_called_once_with(c)
+    container._child_value_changed.reset_mock()
+    assert not container._child_address_changed.mock_calls
+    my_char.address = 0x1234
+    assert not container._child_value_changed.mock_calls
+    assert not container._child_address_changed.mock_calls
+    
+    # Should get informed of address changes as usual
+    c.address = 0xDEADBEEF
+    container._child_address_changed.assert_called_once_with(c)

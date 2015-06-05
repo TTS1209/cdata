@@ -1,3 +1,7 @@
+import pytest
+
+from mock import Mock
+
 from cdata.struct import Struct, StructInstance
 
 from cdata.primitive import char, unsigned_char
@@ -46,6 +50,40 @@ def test_struct():
     assert t.a.address is None
     assert t.b.address is None
     
+    # Should be able to change the addresses of children to the correct value
+    # with no complaints
+    t.address = None
+    t.a.address = None
+    t.b.address = None
+    assert t.address is None
+    assert t.a.address is None
+    assert t.b.address is None
+    
+    t.address = 0x1000
+    t.a.address = 0x1000
+    t.b.address = 0x1001
+    assert t.address == 0x1000
+    assert t.a.address == 0x1000
+    assert t.b.address == 0x1001
+    
+    # Should get an error if the address is changed erroneously
+    with pytest.raises(ValueError):
+        t.a.address = 0xFFFF
+    with pytest.raises(ValueError):
+        t.b.address = 0xFFFF
+    assert t.address == 0x1000
+    assert t.a.address == 0x1000
+    assert t.b.address == 0x1001
+    
+    t.address = None
+    with pytest.raises(ValueError):
+        t.a.address = 0xFFFF
+    with pytest.raises(ValueError):
+        t.b.address = 0xFFFF
+    assert t.address is None
+    assert t.a.address is None
+    assert t.b.address is None
+    
     # Packing should work and, because both struct elements are bytes, the
     # ordering should not be changed by endianness.
     for endianness in Endianness:
@@ -57,3 +95,28 @@ def test_struct():
         t.unpack(b"H\xAA", endianness)
         assert t.a.value == b"H"
         assert t.b.value == 0xAA
+
+
+def test_container():
+    struct_test = Struct("test",
+                         ("a", char),
+                         ("b", unsigned_char))
+    s = struct_test()
+    
+    container = Mock()
+    s._parents.append(container)
+    
+    # Changing the address should cause a callback
+    s.address = 0xDEADBEEF
+    container._child_address_changed.assert_called_once_with(s)
+    container._child_address_changed.reset_mock()
+    
+    # Changing a struct member's address shouldn't
+    s.a.address = 0xDEADBEEF
+    assert not container._child_address_changed.called
+    
+    # Changing a struct member's value should cause a callback (more
+    # exhaustively tested by ComplexType base class)
+    s.a.value = b"J"
+    container._child_value_changed.assert_called_once_with(s)
+    container._child_value_changed.reset_mock()
