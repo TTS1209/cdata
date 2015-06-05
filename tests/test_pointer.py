@@ -119,22 +119,22 @@ def test_not_null():
     assert c.deref.value == b"\0"
     assert c.deref.address == 0xFFFFFFFF
     
-    # If we don't change the pointer address, the underlying character instance
+    # If we don't change the pointer ref, the underlying character instance
     # referenced should not be touched
     referenced_char_inst = c.deref
     referenced_char_inst.value = b"J"
+    referenced_char_inst.address = 0xDEADBEEF
     c.unpack(b"\xEF\xBE\xAD\xDE")
     assert c.ref == 0xDEADBEEF
     assert c.deref is referenced_char_inst
     
     # If we do change the pointer address, the underlying character instance
-    # should have its address changed.
+    # should be replaced
     c.unpack(b"\x78\x56\x34\x12")
     assert c.ref == 0x12345678
-    assert c.deref is referenced_char_inst
-    assert c.deref is not None
+    assert c.deref is not referenced_char_inst
     assert c.deref.address == 0x12345678
-    assert c.deref.value == b"J"
+    assert c.deref.value == b"\0"
 
 @pytest.mark.parametrize("n_bits", [8, 16, 32, 64])
 def test_lengths(n_bits):

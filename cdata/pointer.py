@@ -175,10 +175,9 @@ class PointerInstance(Instance):
         
         If changed to 0, NULL out the pointer.
         
-        If the pointer is currently NULL, create a new (default) instance with
-        the specified address.
-        
-        Otherwise, change the address of the current instance.
+        If the pointer is currently NULL, or the address is different to the
+        address of the current deref instance, create a new (default) instance
+        with the specified address.
         """
         # Check the address is within the allowable range
         if address & ~((1 << self.data_type.pointer_size) - 1):
@@ -189,13 +188,11 @@ class PointerInstance(Instance):
         if address == 0:
             # Passed a NULL address
             self.deref = None
-        else:
-            # Create a new instance if the pointer was NULL
-            if self.deref is None:
-                self.deref = self.data_type.base_type()
-            
-            # Set the address of the pointed-to instance accordingly
-            self.deref.address = address
+        elif self.deref is None or self.deref.address != address:
+            # Create a new instance if the address changed
+            inst = self.data_type.base_type()
+            inst.address = address
+            self.deref = inst
     
     @property
     def size(self):

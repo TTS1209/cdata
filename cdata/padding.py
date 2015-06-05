@@ -1,10 +1,5 @@
 """A simple padding type."""
 
-import builtins
-import struct
-
-from six import integer_types
-
 from cdata.base import DataType, Instance
 
 from cdata.endianness import Endianness
