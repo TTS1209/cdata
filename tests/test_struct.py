@@ -41,7 +41,8 @@ def test_struct():
     assert str(t) == "{a: b'J', b: 255}"
     assert repr(t) == "<struct test: {a: b'J', b: 255}>"
     
-    # Should be able to change the address and change all members addresses too
+    # Should be able to change the address which should change all members
+    # addresses too
     assert t.address is None
     t.address = 0x1000
     assert t.a.address == 0x1000

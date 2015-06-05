@@ -67,7 +67,7 @@ class StructInstance(ComplexTypeInstance):
     
     def _child_address_changed(self, child):
         """When a child's address is changed, thrown an exception if it is
-        inconsistent."""
+        inconsistent (after changing it back)."""
         address = self.address
         
         # Find the child member in the struct (while calculating the appropriate
