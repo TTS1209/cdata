@@ -5,9 +5,12 @@ import struct
 
 from six import integer_types
 
-from .base import DataType, Instance
+from cdata.base import DataType, Instance
 
-from .endianness import Endianness
+from cdata.endianness import Endianness
+
+from cdata.utils import char_literal
+
 
 class Primitive(DataType):
     """Defines generic primitive data-types as supported by :py:mod:`struct`.
@@ -96,16 +99,6 @@ def _cast_char(value):
         # Truncate bytes to a single byte/character
         return bytes([bytes(value)[0]])
 
-def _literal_char(value):
-    """Render a character as a C literal."""
-    
-    int = builtins.int
-    value = int(value[0])
-    if value < 128:
-        return "'{}'".format(repr(chr(value))[1:-1])
-    else:
-        return "'\\x{:02x}'".format(value)
-
 def _cast_signed(value, n_bits):
     """Utility function: return the value cast into a signed integer with the
     specified number of bits."""
@@ -124,7 +117,7 @@ def _cast_unsigned(value, n_bits):
 char = Primitive(name="char", struct_format="c",
                  default_value=b"\0",
                  cast=_cast_char,
-                 to_literal=_literal_char,
+                 to_literal=char_literal,
                  native=True)
 
 signed_char = Primitive(name="signed char", struct_format="b",

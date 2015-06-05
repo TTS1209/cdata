@@ -32,3 +32,17 @@ class EmptyIterable(object):
         return iter([])
 
 empty_iterable = EmptyIterable()
+
+
+def char_literal(value):
+    """Render a char as a C literal."""
+    
+    value = int(value[0])
+    if value < 128:
+        if value == ord("'"):
+            # Special case: needs escaping
+            return "'\\''"
+        else:
+            return "'{}'".format(repr(chr(value))[1:-1])
+    else:
+        return "'\\x{:02x}'".format(value)

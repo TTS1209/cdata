@@ -29,7 +29,7 @@ class DataType(object):
         Parameters
         ----------
         name : str or None
-            The C identifier (name) of this type or None if this type is
+            The C identifier (name) of this type or the full type if it is
             anonymous.
         native : bool
             Is this type native to C (or the standard-library)?

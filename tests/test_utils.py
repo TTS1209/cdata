@@ -1,4 +1,4 @@
-from cdata.utils import indent, empty_iterable
+from cdata.utils import indent, empty_iterable, char_literal
 
 
 def test_indent():
@@ -41,3 +41,26 @@ def test_empty_iterable():
     # The empty iterable should work multiple times!
     for _ in range(10):
         assert list(empty_iterable) == []
+
+
+def test_char_literal():
+    # Printable characters should be represented as literals (just test a random
+    # selection
+    assert char_literal(b"!") == "'!'"
+    assert char_literal(b"a") == "'a'"
+    assert char_literal(b"0") == "'0'"
+    assert char_literal(b"?") == "'?'"
+    assert char_literal(b"\"") == "'\"'"
+    
+    # Characters which require escaping should be
+    assert char_literal(b"'") == "'\\''"
+    
+    # Common special characters should work
+    assert char_literal(b"\n") == "'\\n'"
+    assert char_literal(b"\r") == "'\\r'"
+    assert char_literal(b"\t") == "'\\t'"
+    
+    # Non-printable characters should be shown in hex
+    assert char_literal(b"\x00") == "'\\x00'"
+    assert char_literal(b"\xAA") == "'\\xaa'"
+    assert char_literal(b"\xFF") == "'\\xff'"
