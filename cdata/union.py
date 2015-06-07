@@ -33,11 +33,16 @@ class UnionInstance(ComplexTypeInstance):
         if num_args + num_kwargs > 1:
             raise ValueError("At most one union member may be initialised.")
         
-        super(UnionInstance, self).__init__(data_type, *args, **kwargs)
-        
         # If this flag is set, all calls to _child_value_changed are ignored.
         # This is required since when the union is changed all members of the
-        # struct must be overwritten.
+        # struct must be overwritten. Initially disabled while initialisation
+        # takes place.
+        self._ignore_child_value_changed = True
+        
+        super(UnionInstance, self).__init__(data_type, *args, **kwargs)
+        
+        # Re-enable child value change updates now the union has been
+        # initialised.
         self._ignore_child_value_changed = False
         
         # Ensure consistent initial addresses
@@ -143,3 +148,10 @@ class UnionInstance(ComplexTypeInstance):
             self._value_changed()
         finally:
             self._ignore_child_value_changed = False
+    
+    def _set_member(self, member, instance):
+        super(UnionInstance, self)._set_member(member, instance)
+        
+        # Fix the address and update the union's value
+        instance.address = self.address
+        self._child_value_changed(instance)

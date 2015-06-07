@@ -67,6 +67,12 @@ def test_struct():
     assert t.a.address == 0x1000
     assert t.b.address == 0x1001
     
+    # If a new instance is inserted, its address should be assigned
+    uc = unsigned_char(t.b.value)
+    uc.address = 0xDEADBEEF
+    t.b = uc
+    assert uc.address == 0x1001
+    
     # Should get an error if the address is changed erroneously
     with pytest.raises(ValueError):
         t.a.address = 0xFFFF

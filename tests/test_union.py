@@ -78,6 +78,12 @@ def test_union():
     assert t.a.address == 0x1000
     assert t.b.address == 0x1000
     
+    # Should be able to set an instance and its address should be updated
+    new_a = unsigned_char(t.a.value)
+    new_a.address = 0xDEADBEEF
+    t.a = new_a
+    assert new_a.address == 0x1000
+    
     t.address = None
     with pytest.raises(ValueError):
         t.a.address = 0xFFFF
@@ -173,6 +179,12 @@ def test_union_behaviour(endianness, a, b,
     assert t.a.value == a_then_b_a_value
     assert t.b.value == a_then_b_b_value
     
+    t = union_test()
+    t.a = unsigned_char(a)
+    t.b = unsigned_short(b)
+    assert t.a.value == a_then_b_a_value
+    assert t.b.value == a_then_b_b_value
+    
     # Should be able to set b then a
     t = union_test(b=unsigned_short(b))
     t.a.value = a
@@ -182,6 +194,12 @@ def test_union_behaviour(endianness, a, b,
     t = union_test()
     t.b.value = b
     t.a.value = a
+    assert t.a.value == b_then_a_a_value
+    assert t.b.value == b_then_a_b_value
+    
+    t = union_test()
+    t.b = unsigned_short(b)
+    t.a = unsigned_char(a)
     assert t.a.value == b_then_a_a_value
     assert t.b.value == b_then_a_b_value
     

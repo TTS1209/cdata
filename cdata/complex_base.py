@@ -228,7 +228,7 @@ class ComplexTypeInstance(Instance):
     
     def __setattr__(self, name, value):
         """Handles writes to member instances."""
-        if name != "_member_instances" and name in self._member_instances:
+        if not name.startswith("_") and name in self._member_instances:
             # Check that the value is of the correct type before accepting the
             # new value
             if (not hasattr(value, "data_type") or

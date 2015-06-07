@@ -93,3 +93,9 @@ class StructInstance(ComplexTypeInstance):
         # there has been a bug somewhere.
         assert False, (  # pragma: no cover
             "Child is not a member of this struct. This is a bug.")
+    
+    def _set_member(self, name, instance):
+        super(StructInstance, self)._set_member(name, instance)
+        
+        # Re-compute all addresses in order to assign an address to this member
+        self.address = self.address
