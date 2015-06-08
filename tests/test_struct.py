@@ -122,8 +122,17 @@ def test_container():
     s.a.address = 0xDEADBEEF
     assert not container._child_address_changed.called
     
-    # Changing a struct member's value should cause a callback (more
-    # exhaustively tested by ComplexType base class)
+    # Changing a struct member's value should cause a callback
     s.a.value = b"J"
+    container._child_value_changed.assert_called_once_with(s)
+    container._child_value_changed.reset_mock()
+    
+    # As should changing the instance
+    s.a = char(b"J")
+    container._child_value_changed.assert_called_once_with(s)
+    container._child_value_changed.reset_mock()
+    
+    # As should unpacking
+    s.unpack(b"\0\0")
     container._child_value_changed.assert_called_once_with(s)
     container._child_value_changed.reset_mock()

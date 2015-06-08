@@ -38,6 +38,9 @@ class FooInstance(ComplexTypeInstance):
     def _child_address_changed(self, child):
         # Just do nothing
         pass
+    
+    def _child_value_changed(self, child):
+        self._value_changed()
 
 def test_empty():
     # Test nothing falls over when creating empty types

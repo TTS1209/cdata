@@ -217,7 +217,7 @@ class ComplexTypeInstance(Instance):
         self._member_instances[name] = instance
         instance._parents.append(self)
         
-        self._value_changed()
+        self._child_value_changed(instance)
     
     def __getattr__(self, name):
         """Handles reads of member instances."""
@@ -263,7 +263,3 @@ class ComplexTypeInstance(Instance):
             ", ".join("{}: {}".format(name, str(instance))
                       for name, instance
                       in iteritems(self._member_instances)))
-    
-    def _child_value_changed(self, child):
-        # If a member changes, this complex type by definition is also changed.
-        self._value_changed()

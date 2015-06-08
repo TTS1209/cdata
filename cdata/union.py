@@ -112,9 +112,15 @@ class UnionInstance(ComplexTypeInstance):
                     self.data_type.endianness.name,
                     endianness.name))
         
+        old_ignore_child_value_changed = self._ignore_child_value_changed
+        self._ignore_child_value_changed = True
         for instance in itervalues(self._member_instances):
             # Unpack the same data (or a subset thereof) into each member.
             instance.unpack(data[:instance.size], endianness)
+        self._ignore_child_value_changed = old_ignore_child_value_changed
+        
+        if not self._ignore_child_value_changed:
+            self._value_changed()
     
     def _child_address_changed(self, child):
         """Throw a ValueError if any child's address is changed inconsistently
@@ -133,25 +139,22 @@ class UnionInstance(ComplexTypeInstance):
         In order to prevent uncontrolled recursion, all value-changed callbacks
         are ignored while this function is called.
         """
-        if self._ignore_child_value_changed:
-            return
-        self._ignore_child_value_changed = True
-        try:
-            # Update the current packed value with the new contents
-            packed_value = bytearray(self.pack(self.data_type.endianness))
-            packed_value[:child.size] = child.pack(self.data_type.endianness)
-            
-            # Now unpack that into all children
-            self.unpack(packed_value, self.data_type.endianness)
-            
-            # Finally, report that the union's value was changed
-            self._value_changed()
-        finally:
-            self._ignore_child_value_changed = False
+        if not self._ignore_child_value_changed:
+            self._ignore_child_value_changed = True
+            try:
+                # Update the current packed value with the new contents
+                packed_value = bytearray(self.pack(self.data_type.endianness))
+                packed_value[:child.size] = child.pack(self.data_type.endianness)
+                
+                # Now unpack that into all children
+                self.unpack(packed_value, self.data_type.endianness)
+                
+                # Finally, report that the union's value was changed
+                self._value_changed()
+            finally:
+                self._ignore_child_value_changed = False
     
     def _set_member(self, member, instance):
-        super(UnionInstance, self)._set_member(member, instance)
-        
         # Fix the address and update the union's value
         instance.address = self.address
-        self._child_value_changed(instance)
+        super(UnionInstance, self)._set_member(member, instance)

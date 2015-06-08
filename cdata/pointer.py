@@ -43,8 +43,8 @@ class Pointer(DataType):
                     pointer_size,
                     ", ".join(map(str, Pointer.POINTER_TYPES))))
         
-        super(Pointer, self).__init__("{}*".format(self.base_type.name),
-                                      base_type.native)
+        # Pointers are native since they're a basic part of the language
+        super(Pointer, self).__init__("{}*".format(self.base_type.name), True)
     
     def __call__(self, *args, **kwargs):
         return PointerInstance(self, *args, **kwargs)

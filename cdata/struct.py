@@ -21,6 +21,9 @@ class StructInstance(ComplexTypeInstance):
     """An instance of a struct type."""
     
     def __init__(self, *args, **kwargs):
+        # Used to suppress value changed notifications during unpacking
+        self._ignore_child_value_changed = False
+        
         super(StructInstance, self).__init__(*args, **kwargs)
         # This will cause any child instances to have their addresses reset
         self.address = None
@@ -61,9 +64,18 @@ class StructInstance(ComplexTypeInstance):
                         for i in itervalues(self._member_instances))
     
     def unpack(self, data, endianness=Endianness.little):
+        self._ignore_child_value_changed = True
+        
         for instance in itervalues(self._member_instances):
             this_data, data = data[:instance.size], data[instance.size:]
             instance.unpack(this_data, endianness)
+        
+        self._ignore_child_value_changed = False
+        self._value_changed()
+    
+    def _child_value_changed(self, child):
+        if not self._ignore_child_value_changed:
+            self._value_changed()
     
     def _child_address_changed(self, child):
         """When a child's address is changed, thrown an exception if it is
