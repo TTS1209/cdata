@@ -23,6 +23,14 @@ class DataType(object):
         The C type definition for this data type (often blank).
     """
     
+    # Placed here so that these names appear in the dir() of this class to allow
+    # discovery of the names used by the class before it is instantiateed. This
+    # is useful since some datatypes may wish to add user-defined attributes to
+    # an Instance object and therefore it is important that any names which are
+    # reserved are known.
+    name = None
+    native = None
+    
     def __init__(self, name=None, native=False):
         """Define a new data type.
         
@@ -247,8 +255,8 @@ class Instance(object):
             should generate no values.
         """
         # A sensible (empty) iterator for types which don't contain other types.
-        if False:
-            yield
+        if False:  # pragma: no branch
+            yield  # pragma: no cover
     
     def __str__(self):
         """Produce a human-readable version of the value of this instance."""
