@@ -17,6 +17,10 @@ class DataType(object):
         The C identifier (name) of this type or None if this type is anonymous.
     native : bool
         Is this type native to C (or the standard-library)?
+    doc : str
+        An (optionally defined) string which describes the purpose of this type.
+        This will be prepended as a comment to the definition of the type, if it
+        has one.
     prototype : str
         The C type prototype for this data type (often blank).
     definition : str
@@ -31,7 +35,7 @@ class DataType(object):
     name = None
     native = None
     
-    def __init__(self, name=None, native=False):
+    def __init__(self, name=None, native=False, doc=""):
         """Define a new data type.
         
         Parameters
@@ -41,9 +45,18 @@ class DataType(object):
             anonymous.
         native : bool
             Is this type native to C (or the standard-library)?
+        doc : str
+            An (optionally defined) string which describes the purpose of this
+            type. This will be prepended as a comment to the definition of the
+            type, if it has one.
         """
         self.name = name
         self.native = native
+        self.doc = doc
+        
+        # Set the datatype's docstring accordingly.
+        if doc:
+            self.__doc__ = doc
     
     def __call__(self):
         """Instantiate a new instance of this data type with the values passed

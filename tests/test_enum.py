@@ -27,6 +27,44 @@ def test_enum_named():
     assert repr(my_enum) == "<Enum: enum my_enum>"
 
 
+def test_enum_documented():
+    # Test that when a documentation string is added, it appears in the
+    # definition as a comment.
+    my_enum = Enum("my_enum",
+                   ("ONE", 1, "The first value."),
+                   ("TWO", 2, "The second value."),
+                   ("THREE", 3, "The third value."),
+                   doc="An example enum type.")
+    
+    assert my_enum.name == "enum my_enum"
+    assert my_enum.native == False
+    assert my_enum.prototype == "enum my_enum;"
+    assert my_enum.definition == ("/* An example enum type.\n"
+                                  " */\n"
+                                  "enum my_enum {\n"
+                                  "    /* The first value.\n"
+                                  "     */\n"
+                                  "    ONE = 1,\n"
+                                  "    /* The second value.\n"
+                                  "     */\n"
+                                  "    TWO = 2,\n"
+                                  "    /* The third value.\n"
+                                  "     */\n"
+                                  "    THREE = 3\n"
+                                  "};")
+    assert my_enum.declare() == "enum my_enum"
+    assert my_enum.declare("magic") == "enum my_enum magic"
+    assert list(my_enum.iter_types()) == [my_enum]
+    assert repr(my_enum) == "<Enum: enum my_enum>"
+    
+    # Should not be added for anonymous enums (since there is no definition)
+    my_enum = Enum(("ONE", 1),
+                   ("TWO", 2),
+                   ("THREE", 3),
+                   doc="An example enum type.")
+    assert my_enum.definition == ""
+
+
 def test_enum_anonymous():
     # Test the basic data type features work as expected for named enums.
     my_enum = Enum(("ONE", 1),

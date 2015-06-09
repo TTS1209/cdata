@@ -294,3 +294,26 @@ def test_nested():
     with pytest.raises(ValueError):
         union_outer(b=union_inner(unsigned_char(123)),
                     b__a=unsigned_char(123))
+
+def test_documentation():
+    # Check that documentation gets appled to the definition
+    union_test = Union("test",
+                       ("a", unsigned_char),
+                       ("b", unsigned_short),
+                       doc="An example union.")
+    
+    assert union_test.name == "union test"
+    assert union_test.native == False
+    assert union_test.prototype == "union test;"
+    assert union_test.definition == ("/* An example union.\n"
+                                     " */\n"
+                                     "union test {\n"
+                                      "    unsigned char a;\n"
+                                      "    unsigned short b;\n"
+                                      "};")
+    assert union_test.declare() == ("union test")
+    assert union_test.declare("magic") == ("union test magic")
+    assert list(union_test.iter_types()) == [unsigned_char,
+                                             unsigned_short,
+                                             union_test]
+    assert repr(union_test) == "<Union: union test>"

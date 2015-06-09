@@ -13,7 +13,7 @@ class Padding(DataType):
     returns that value when packed. By default they pack into null bytes.
     """
     
-    def __init__(self, length):
+    def __init__(self, length, doc=""):
         """Define a new padding value type which pads the specified number of
         bytes.
         
@@ -28,7 +28,7 @@ class Padding(DataType):
         
         # The padding type just uses arrays of chars and thus is completely
         # native.
-        super(Padding, self).__init__(name, True)
+        super(Padding, self).__init__(name, True, doc)
     
     def __call__(self):
         return PaddingInstance(self)

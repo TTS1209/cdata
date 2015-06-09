@@ -21,7 +21,7 @@ class Primitive(DataType):
     """
     
     def __init__(self, name, struct_format, default_value,
-                 cast, to_literal=repr, native=False):
+                 cast, to_literal=repr, native=False, doc=""):
         """Define a new primitive type.
         
         Parameters
@@ -43,7 +43,7 @@ class Primitive(DataType):
         self.cast = cast
         self.to_literal = to_literal
         
-        super(Primitive, self).__init__(name, native)
+        super(Primitive, self).__init__(name, native, doc)
     
     def __call__(self, value=None):
         if value is None:
@@ -118,73 +118,101 @@ char = Primitive(name="char", struct_format="c",
                  default_value=b"\0",
                  cast=_cast_char,
                  to_literal=char_literal,
-                 native=True)
+                 native=True,
+                 doc="An 8-bit character, represented in Python as a "
+                     "one-character byte string.")
 
 signed_char = Primitive(name="signed char", struct_format="b",
                         default_value=0,
                         cast=(lambda c: _cast_signed(c, 8)),
-                        native=True)
+                        native=True,
+                        doc="An unsigned 8-bit number, represented in Python "
+                            "as a non-negative int.")
 
 unsigned_char = Primitive(name="unsigned char", struct_format="B",
                           default_value=0,
                           cast=(lambda c: _cast_unsigned(c, 8)),
-                          native=True)
+                          native=True,
+                          doc="A signed 8-bit number, represented in "
+                              "Python as an int.")
 
 _Bool = Primitive(name="_Bool", struct_format="?",
                   default_value=False,
                   cast=bool,
                   to_literal=(lambda b: "1" if b else "0"),
-                  native=True)
+                  native=True,
+                  doc="A native C bool (represented as a byte), represented "
+                      "in Python as a bool.")
 
 short = Primitive(name="short", struct_format="h",
                   default_value=0,
                   cast=(lambda i: _cast_signed(i, 16)),
-                  native=True)
+                  native=True,
+                  doc="A signed 16-bit number, represented in "
+                      "Python as an int.")
 
 unsigned_short = Primitive(name="unsigned short", struct_format="H",
                            default_value=0,
                            cast=(lambda i: _cast_unsigned(i, 16)),
-                           native=True)
+                           native=True,
+                           doc="An unsigned 16-bit number, represented in "
+                               "Python as a non-negative int.")
 
 # Warning: redefines "int"
 int = Primitive(name="int", struct_format="i",
                 default_value=0,
                 cast=(lambda i: _cast_signed(i, 32)),
-                native=True)
+                native=True,
+                doc="A signed 32-bit number, represented in "
+                    "Python as an int.")
 
 unsigned_int = Primitive(name="unsigned int", struct_format="I",
                          default_value=0,
                          cast=(lambda i: _cast_unsigned(i, 32)),
-                         native=True)
+                         native=True,
+                         doc="An unsigned 32-bit number, represented in "
+                             "Python as a non-negative int.")
 
 # Warning: redefines "long"
 long = Primitive(name="long", struct_format="l",
                  default_value=0,
                  cast=(lambda l: _cast_signed(l, 32)),
-                 native=True)
+                 native=True,
+                 doc="A signed 32-bit number, represented in "
+                     "Python as an int.")
 
 unsigned_long = Primitive(name="unsigned long", struct_format="L",
                           default_value=0,
                           cast=(lambda l: _cast_unsigned(l, 32)),
-                          native=True)
+                          native=True,
+                          doc="An unsigned 32-bit number, represented in "
+                              "Python as a non-negative int.")
 
 long_long = Primitive(name="long long", struct_format="q",
                       default_value=0,
                       cast=(lambda ll: _cast_signed(ll, 64)),
-                      native=True)
+                      native=True,
+                      doc="A signed 64-bit number, represented in "
+                          "Python as an int.")
 
 unsigned_long_long = Primitive(name="unsigned long long", struct_format="Q",
                                default_value=0,
                                cast=(lambda ll: _cast_unsigned(ll, 64)),
-                               native=True)
+                               native=True,
+                               doc="An unsigned 64-bit number, represented in "
+                                   "Python as a non-negative int.")
 
 # Warning: redefines "long"
 float = Primitive(name="float", struct_format="f",
                   default_value=0.0,
                   cast=builtins.float,
-                  native=True)
+                  native=True,
+                  doc="A 32-bit floating point number, represented in "
+                      "Python as a float.")
 
 double = Primitive(name="double", struct_format="d",
                    default_value=0.0,
                    cast=builtins.float,
-                   native=True)
+                   native=True,
+                   doc="A 64-bit floating point number, represented in "
+                       "Python as a float.")

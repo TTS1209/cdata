@@ -9,8 +9,8 @@ from cdata.complex_base import ComplexType, ComplexTypeInstance
 class Struct(ComplexType):
     """Define C-style structs."""
     
-    def __init__(self, *args, native=False):
-        super(Struct, self).__init__("struct", *args, native=native)
+    def __init__(self, *args, native=False, doc=""):
+        super(Struct, self).__init__("struct", *args, native=native, doc=doc)
     
     
     def __call__(self, *args, **kwargs):

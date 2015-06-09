@@ -21,7 +21,7 @@ class Pointer(DataType):
         64: "Q",
     }
     
-    def __init__(self, base_type, pointer_size=32):
+    def __init__(self, base_type, pointer_size=32, doc=""):
         """Define a pointer type.
         
         Parameters
@@ -43,8 +43,9 @@ class Pointer(DataType):
                     pointer_size,
                     ", ".join(map(str, Pointer.POINTER_TYPES))))
         
-        # Pointers are native since they're a basic part of the language
-        super(Pointer, self).__init__("{}*".format(self.base_type.name), True)
+        # Pointers are always "native" since they're a basic part of the language
+        super(Pointer, self).__init__("{}*".format(self.base_type.name),
+              True, doc)
     
     def __call__(self, *args, **kwargs):
         return PointerInstance(self, *args, **kwargs)

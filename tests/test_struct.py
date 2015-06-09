@@ -136,3 +136,23 @@ def test_container():
     s.unpack(b"\0\0")
     container._child_value_changed.assert_called_once_with(s)
     container._child_value_changed.reset_mock()
+
+def test_documented():
+    struct_test = Struct("test",
+                         ("a", char),
+                         ("b", unsigned_char),
+                         doc="An example struct.")
+    
+    assert struct_test.name == "struct test"
+    assert struct_test.native == False
+    assert struct_test.prototype == "struct test;"
+    assert struct_test.definition == ("/* An example struct.\n"
+                                      " */\n"
+                                      "struct test {\n"
+                                      "    char a;\n"
+                                      "    unsigned char b;\n"
+                                      "};")
+    assert struct_test.declare() == ("struct test")
+    assert struct_test.declare("magic") == ("struct test magic")
+    assert list(struct_test.iter_types()) == [char, unsigned_char, struct_test]
+    assert repr(struct_test) == "<Struct: struct test>"

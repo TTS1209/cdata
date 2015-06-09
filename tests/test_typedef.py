@@ -58,6 +58,22 @@ def test_typedef():
     assert child is c
 
 
+def test_typedef_documented():
+    # Check that documentation gets added to the definition only.
+    char_t = Typedef("char_t", char, doc="An example typedef.")
+    
+    assert char_t.name == "char_t"
+    assert char_t.native == False
+    assert char_t.prototype == ""
+    assert char_t.definition == ("/* An example typedef.\n"
+                                 " */\n"
+                                 "typedef char char_t;")
+    assert char_t.declare() == "char_t"
+    assert char_t.declare("magic") == "char_t magic"
+    assert list(char_t.iter_types()) == [char, char_t]
+    assert repr(char_t) == "<Typedef: char_t>"
+
+
 def test_multiple_typedef_instances():
     """This test ensures that multiple instances of a typedef can exist at once.
     This essentially verifies that the magic going on in the TypedefInstance

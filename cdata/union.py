@@ -9,8 +9,8 @@ from cdata.complex_base import ComplexType, ComplexTypeInstance
 class Union(ComplexType):
     """Define C-style unions."""
     
-    def __init__(self, *args, endianness=Endianness.little, native=False):
-        super(Union, self).__init__("union", *args, native=native)
+    def __init__(self, *args, endianness=Endianness.little, native=False, doc=""):
+        super(Union, self).__init__("union", *args, native=native, doc=doc)
         self.endianness = endianness
     
     

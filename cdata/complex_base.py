@@ -7,13 +7,13 @@ from collections import defaultdict, OrderedDict
 
 from cdata.base import DataType, Instance
 
-from cdata.utils import indent
+from cdata.utils import indent, comment
 
 
 class ComplexType(DataType):
     """The base type for C structs and unions."""
     
-    def __init__(self, complex_type, *args, native=False):
+    def __init__(self, complex_type, *args, native=False, doc=""):
         """Define a complex type.
         
         Parameters
@@ -25,9 +25,12 @@ class ComplexType(DataType):
             complex_type_name is 'foo', the new type is called 'struct foo'). If
             omitted, the type will be defined anonymously, i.e. suitable for
             nesting or typedefing.
-        *members : (name, :py:class:`.DataType`), ...
+        *members : (name, :py:class:`.DataType`, doc), ...
             The remaining arguments must be a set of member names and their
-            types.
+            types. These arguments may optionally additionally include a
+            documentation string which describes the member. If present, this
+            documentation is printed as a comment in the definition of the
+            struct.
         """
         self._complex_type = complex_type
         
@@ -40,8 +43,16 @@ class ComplexType(DataType):
         
         # The remaining arguments list the struct's members.
         self._members = OrderedDict()
-        for name, data_type in args:
+        self._member_docs = OrderedDict()
+        for name_data_type_doc in args:
+            if len(name_data_type_doc) == 2:
+                name, data_type = name_data_type_doc
+                member_doc = ""
+            else:
+                name, data_type, member_doc = name_data_type_doc
+            
             self._members[name] = data_type
+            self._member_docs[name] = member_doc
         
         # Make sure the complex type's member names do not clash with any
         # members of the ComplexTypeInstance class (since the members are
@@ -68,7 +79,7 @@ class ComplexType(DataType):
             # If the type is anonymous, its name is its full definition (less
             # the semicolon)
             name = self._definition.rstrip(";")
-        super(ComplexType, self).__init__(name=name, native=native)
+        super(ComplexType, self).__init__(name=name, native=native, doc=doc)
     
     @property
     def prototype(self):
@@ -83,7 +94,10 @@ class ComplexType(DataType):
     def definition(self):
         # Non-anonymous complex types *do* have definitions
         if self._complex_type_name is not None:
-            return self._definition
+            if self.doc:
+                return "{}\n{}".format(comment(self.doc), self._definition)
+            else:
+                return self._definition
         else:
             return ""
     
@@ -91,9 +105,17 @@ class ComplexType(DataType):
     @property
     def _definition(self):
         """The full definition of this type, even if it is anonymous."""
-        members = "\n".join("{};".format(data_type.declare(name))
-                            for name, data_type
-                            in iteritems(self._members))
+        member_declarations = []
+        for name, data_type in iteritems(self._members):
+            declaration = "{};".format(data_type.declare(name))
+            
+            member_doc = self._member_docs[name]
+            if member_doc:
+                declaration = "{}\n{}".format(comment(member_doc), declaration)
+            
+            member_declarations.append(declaration)
+            
+        members = "\n".join(member_declarations)
         
         return ("{} {}{{\n"
                 "{}\n"

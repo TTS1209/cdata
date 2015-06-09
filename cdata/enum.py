@@ -12,7 +12,7 @@ from cdata.base import DataType, Instance
 
 from cdata.primitive import Primitive, unsigned_int
 
-from cdata.utils import indent
+from cdata.utils import indent, comment
 
 class Enum(DataType):
     """A C enumeration type."""
@@ -25,7 +25,7 @@ class Enum(DataType):
         64: "Q",
     }
     
-    def __init__(self, *members, enum_size=32, native=False):
+    def __init__(self, *members, enum_size=32, native=False, doc=""):
         """Define a new enumeration type.
         
         Parameters
@@ -60,7 +60,13 @@ class Enum(DataType):
         # Validate and record the members of the enumeration
         next_value = 0
         self._members = OrderedDict()
-        for name, value in members:
+        self._member_docs = OrderedDict()
+        for name_value_doc in members:
+            if len(name_value_doc) == 2:
+                name, value = name_value_doc
+                member_doc = ""
+            else:
+                name, value, member_doc = name_value_doc
             # Automatically assign values to members if non given
             if value is None:
                 value = next_value
@@ -79,6 +85,7 @@ class Enum(DataType):
                 raise ValueError("name '{}' is reserved".format(name))
             
             self._members[name] = value
+            self._member_docs[name] = member_doc
             next_value = value + 1
         
         # If anonymous, the name of the type becomes its full definition.
@@ -87,7 +94,7 @@ class Enum(DataType):
         else:
             name = self._definition.rstrip(";")
         
-        super(Enum, self).__init__(name, native)
+        super(Enum, self).__init__(name, native, doc)
     
     def __call__(self, name=None):
         """Create an instance of an enumeration value.
@@ -115,15 +122,28 @@ class Enum(DataType):
     @property
     def definition(self):
         if self.enum_name is not None:
-            return self._definition
+            if self.doc:
+                return "{}\n{}".format(comment(self.doc),
+                                       self._definition)
+            else:
+                return self._definition
         else:
             return ""
     
     @property
     def _definition(self):
         """The full definition of the enum, even if it is anonymous."""
-        members = ",\n".join("{} = {}".format(name, value)
-                             for name, value in iteritems(self._members))
+        members = []
+        for name, value in iteritems(self._members):
+            member = "{} = {}".format(name, value)
+            
+            member_doc = self._member_docs[name]
+            if member_doc:
+                member = "{}\n{}".format(comment(member_doc), member)
+            
+            members.append(member)
+            
+        members = ",\n".join(members)
         
         return ("enum {}{{\n"
                 "{}\n"

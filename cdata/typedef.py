@@ -2,19 +2,24 @@
 
 from cdata.base import DataType, Instance
 
+from cdata.utils import comment
+
 class Typedef(DataType):
     """Creates a typedef alias for the supplied type."""
     
-    def __init__(self, name, base_type, native=False):
+    def __init__(self, name, base_type, native=False, doc=""):
         self.base_type = base_type
-        super(Typedef, self).__init__(name, native)
+        super(Typedef, self).__init__(name, native, doc)
     
     def __call__(self, *args, **kwargs):
         return TypedefInstance(self, *args, **kwargs)
     
     @property
     def definition(self):
-        return "typedef {};".format(self.base_type.declare(self.name))
+        definition = "typedef {};".format(self.base_type.declare(self.name))
+        if self.doc:
+            definition = "{}\n{}".format(comment(self.doc), definition)
+        return definition
     
     def iter_types(self, _generated=None):
         if _generated is None:

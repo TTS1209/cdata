@@ -15,8 +15,8 @@ from cdata.endianness import Endianness
 class Foo(ComplexType):
     """Define an example complex type for the purposes of these tests."""
     
-    def __init__(self, *args, native=False):
-        super(Foo, self).__init__("foo", *args, native=native)
+    def __init__(self, *args, native=False, doc=""):
+        super(Foo, self).__init__("foo", *args, native=native, doc=doc)
     
     def __call__(self, *args, **kwargs):
         return FooInstance(self, *args, **kwargs)
@@ -91,6 +91,32 @@ def test_named():
     assert my_foo.prototype == "foo my_foo;"
     assert my_foo.definition == ("foo my_foo {\n"
                                  "    char a;\n"
+                                 "    unsigned char b;\n"
+                                 "};")
+    assert my_foo.declare() == "foo my_foo"
+    assert my_foo.declare("magic") == "foo my_foo magic"
+    assert list(my_foo.iter_types()) == [char, unsigned_char, my_foo]
+    assert repr(my_foo) == "<Foo: foo my_foo>"
+
+def test_documented():
+    # Test that documentation is added as comments to the defintion.
+    my_foo = Foo("my_foo",
+                 ("a", char, "An example variable."),
+                 ("b", unsigned_char, "Another one!"),
+                 doc="An example complex data type.")
+    
+    # Check the type's behaviour
+    assert my_foo.name == "foo my_foo"
+    assert my_foo.native == False
+    assert my_foo.prototype == "foo my_foo;"
+    assert my_foo.definition == ("/* An example complex data type.\n"
+                                 " */\n"
+                                 "foo my_foo {\n"
+                                 "    /* An example variable.\n"
+                                 "     */\n"
+                                 "    char a;\n"
+                                 "    /* Another one!\n"
+                                 "     */\n"
                                  "    unsigned char b;\n"
                                  "};")
     assert my_foo.declare() == "foo my_foo"

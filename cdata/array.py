@@ -17,7 +17,7 @@ class Array(DataType):
     such a pointer).
     """
     
-    def __init__(self, base_type, length):
+    def __init__(self, base_type, length, doc=""):
         """Define a new array of the specified data type and length.
         
         Parameters
@@ -33,7 +33,7 @@ class Array(DataType):
         name = self.declare()
         
         # Arrays are native since they're a basic part of the language.
-        super(Array, self).__init__(name, True)
+        super(Array, self).__init__(name, True, doc)
     
     def __call__(self, values=[]):
         return ArrayInstance(self, values)
