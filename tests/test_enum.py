@@ -15,7 +15,7 @@ def test_enum_named():
     
     assert my_enum.name == "enum my_enum"
     assert my_enum.native == False
-    assert my_enum.prototype == "enum my_enum;"
+    assert my_enum.prototype == ""
     assert my_enum.definition == ("enum my_enum {\n"
                                   "    ONE = 1,\n"
                                   "    TWO = 2,\n"
@@ -38,18 +38,14 @@ def test_enum_documented():
     
     assert my_enum.name == "enum my_enum"
     assert my_enum.native == False
-    assert my_enum.prototype == "enum my_enum;"
-    assert my_enum.definition == ("/* An example enum type.\n"
-                                  " */\n"
+    assert my_enum.prototype == ""
+    assert my_enum.definition == ("/* An example enum type. */\n"
                                   "enum my_enum {\n"
-                                  "    /* The first value.\n"
-                                  "     */\n"
+                                  "    /* The first value. */\n"
                                   "    ONE = 1,\n"
-                                  "    /* The second value.\n"
-                                  "     */\n"
+                                  "    /* The second value. */\n"
                                   "    TWO = 2,\n"
-                                  "    /* The third value.\n"
-                                  "     */\n"
+                                  "    /* The third value. */\n"
                                   "    THREE = 3\n"
                                   "};")
     assert my_enum.declare() == "enum my_enum"

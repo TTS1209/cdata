@@ -113,13 +113,6 @@ class Enum(DataType):
             raise AttributeError(name)
     
     @property
-    def prototype(self):
-        if self.enum_name is not None:
-            return "enum {};".format(self.enum_name)
-        else:
-            return ""
-    
-    @property
     def definition(self):
         if self.enum_name is not None:
             if self.doc:

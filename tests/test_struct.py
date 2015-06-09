@@ -146,8 +146,7 @@ def test_documented():
     assert struct_test.name == "struct test"
     assert struct_test.native == False
     assert struct_test.prototype == "struct test;"
-    assert struct_test.definition == ("/* An example struct.\n"
-                                      " */\n"
+    assert struct_test.definition == ("/* An example struct. */\n"
                                       "struct test {\n"
                                       "    char a;\n"
                                       "    unsigned char b;\n"

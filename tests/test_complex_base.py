@@ -109,14 +109,11 @@ def test_documented():
     assert my_foo.name == "foo my_foo"
     assert my_foo.native == False
     assert my_foo.prototype == "foo my_foo;"
-    assert my_foo.definition == ("/* An example complex data type.\n"
-                                 " */\n"
+    assert my_foo.definition == ("/* An example complex data type. */\n"
                                  "foo my_foo {\n"
-                                 "    /* An example variable.\n"
-                                 "     */\n"
+                                 "    /* An example variable. */\n"
                                  "    char a;\n"
-                                 "    /* Another one!\n"
-                                 "     */\n"
+                                 "    /* Another one! */\n"
                                  "    unsigned char b;\n"
                                  "};")
     assert my_foo.declare() == "foo my_foo"

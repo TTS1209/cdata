@@ -65,8 +65,7 @@ def test_typedef_documented():
     assert char_t.name == "char_t"
     assert char_t.native == False
     assert char_t.prototype == ""
-    assert char_t.definition == ("/* An example typedef.\n"
-                                 " */\n"
+    assert char_t.definition == ("/* An example typedef. */\n"
                                  "typedef char char_t;")
     assert char_t.declare() == "char_t"
     assert char_t.declare("magic") == "char_t magic"

@@ -305,8 +305,7 @@ def test_documentation():
     assert union_test.name == "union test"
     assert union_test.native == False
     assert union_test.prototype == "union test;"
-    assert union_test.definition == ("/* An example union.\n"
-                                     " */\n"
+    assert union_test.definition == ("/* An example union. */\n"
                                      "union test {\n"
                                       "    unsigned char a;\n"
                                       "    unsigned short b;\n"
