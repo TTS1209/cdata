@@ -84,14 +84,29 @@ class TypedefInstance(Instance):
             super(TypedefInstance, self).__setattr__(attr, value)
         else:
             self._base_instance.__setattr__(attr, value)
+
+    def iter_instances(self, _generated=None):
+        if _generated is None:
+            _generated = set()
+        
+        if self not in _generated:
+            # Iterate over this instance as usual (this will add self to
+            # _generated).
+            for ref in super(TypedefInstance, self).iter_instances(_generated):
+                yield ref
+            
+            # Then iterate over the wrapped instance (which notably will not
+            # list itself since it is contained by this typedef, but rather will
+            # include anything they reference).
+            for ref in self._base_instance.iter_instances(_generated):
+                yield ref
     
     
     # The set of all special functions of the base type which will be wrapped by
     # this class. This set notably excludes __repr__ to ensure this class is
     # printed differently.
     WRAPPABLE_FUNCTIONS = set([
-        "__str__", "__bytes__", "__format__", "__lt__", "__le__", "__eq__",
-        "__ne__", "__gt__", "__ge__", "__hash__", "__bool__", "__delattr__",
+        "__str__", "__bytes__", "__format__", "__bool__", "__delattr__",
         "__get__", "__set__", "__delete__", "__call__", "__len__",
         "__getitem__", "__setitem__", "__delitem__", "__iter__", "__reversed__",
         "__contains__"])

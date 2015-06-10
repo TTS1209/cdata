@@ -14,7 +14,7 @@ from cdata.padding import Padding
 
 from cdata.typedef import Typedef
 
-from cdata.pointer import Pointer
+from cdata.pointer import Pointer, pointer
 
 from cdata.struct import Struct
 
@@ -25,3 +25,5 @@ from cdata.array import Array
 from cdata.exceptions import PointerToUndefinedMemoryAddress
 
 from cdata.header_file import to_header
+
+from cdata.alloc import total_size, alloc

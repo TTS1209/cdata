@@ -99,4 +99,32 @@ def test_compound():
                       doc="Information globally applicable to a network node "
                           "(i.e. core).")
     
+    # Header generation should work
     print(cdata.to_header(network_node_spec_t, doc="This is going to be great!"))
+    
+    # An example (partial) initialisation of the data structure.
+    tns = cdata.Array(cdata.Pointer(traffic_node_spec_t), 8)()
+    for tn_p in tns:
+        tn_sources = cdata.Array(traffic_node_source_t, 2)()
+        for source in tn_sources:
+            source.key = cdata.unsigned_int(0x1234)
+        
+        tn = traffic_node_spec_t(type=traffic_node_type_t("TN_BERNOULLI"),
+                                 num_sources=cdata.unsigned_int(2),
+                                 sources=cdata.pointer(tn_sources[0]))
+        tn_p.deref = tn
+    nn = network_node_spec_t(num_traffic_nodes=cdata.unsigned_int(8),
+                             traffic_nodes=cdata.pointer(tns[0]))
+    
+    # Check iteration finds everything. (nn + tns + *tns + tn_sources)
+    assert len(list(nn.iter_instances())) == (1 + 1 + 8 + 8)
+    
+    # Check the size is correct
+    size = cdata.total_size(nn)
+    assert size == ((4 * 4) +  # nn
+                    (4 * 8) +  # tns
+                    ((6 * 4 + 1 + 8) * 8) +  # *tns
+                    ((4 * 4) * 2 * 8))  # tn_sources
+    
+    # Check the allocation size matches
+    assert cdata.alloc(nn, 0x1000) == 0x1000 + size

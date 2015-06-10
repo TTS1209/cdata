@@ -302,7 +302,7 @@ class Instance(object):
         else:
             _generated.add(self)
         
-        if not self._container:
+        if self._container is None:
             # If this instance is a top-level instance, produce itself
             yield self
         else:

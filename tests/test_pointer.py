@@ -4,7 +4,7 @@ from mock import Mock
 
 from cdata.endianness import Endianness
 
-from cdata.pointer import Pointer, PointerInstance
+from cdata.pointer import Pointer, PointerInstance, pointer
 
 from cdata.primitive import char, _Bool
 
@@ -358,3 +358,12 @@ def test_parent(container):
     # iter_instances but shouldn't prevent its child being listed.
     c.deref = char()
     assert list(c.iter_instances()) == [container, c.deref]
+
+
+def test_convenience():
+    # The convenience function should work as advertised.
+    c = char()
+    cp = pointer(c)
+    assert isinstance(cp, PointerInstance)
+    assert cp.deref is c
+    assert cp.data_type.declare() == "char*"

@@ -261,7 +261,7 @@ class ComplexTypeInstance(Instance):
             if (not hasattr(value, "data_type") or
                     value.data_type != self.data_type._members[name]):
                 raise TypeError("member {} is of type {} but got {}".format(
-                    name, repr(self.data_type), repr(value)))
+                    name, repr(self.data_type._members[name]), repr(value)))
             self._set_member(name, value)
         else:
             super(ComplexTypeInstance, self).__setattr__(name, value)

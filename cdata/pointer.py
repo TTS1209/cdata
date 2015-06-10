@@ -246,4 +246,9 @@ class PointerInstance(Instance):
             if self.deref is not None:
                 for ref in self.deref.iter_instances(_generated):
                     yield ref
-            
+
+def pointer(instance):
+    """Convenience function create a pointer instance which points to the
+    specified instance."""
+    return Pointer(instance.data_type)(instance)
+

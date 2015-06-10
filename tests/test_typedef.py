@@ -6,6 +6,8 @@ from cdata.typedef import Typedef, TypedefInstance
 
 from cdata.primitive import char
 
+from cdata.pointer import Pointer
+
 from mock_container import container
 
 def test_typedef():
@@ -45,6 +47,17 @@ def test_typedef():
     # Check the instance remains of the correct type after unpacking
     c.unpack(b"\x12")
     assert c.value == b"\x12"
+
+
+def test_iter_instances():
+    # The typedef should also iterate over its wrapped instance.
+    charp_t = Typedef("charp_t", Pointer(char))
+    cpt = charp_t()
+    assert list(cpt.iter_instances()) == [cpt]
+    
+    c = char()
+    cpt.deref = c
+    assert list(cpt.iter_instances()) == [cpt, c]
 
 def test_parents(container):
     # Check that if the typedef is in a container or is referenced, the calls
