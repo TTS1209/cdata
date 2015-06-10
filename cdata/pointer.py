@@ -140,19 +140,24 @@ class PointerInstance(Instance):
         if instance is None or instance.address == 0:
             # Unregister as a parent of the previous instance.
             if self._deref is not None:
-                self._deref._parents.remove(self)
+                self._deref._referrer = None
             
             # Set to NULL pointer
             self._deref = None
         elif hasattr(instance, "data_type") and (instance.data_type ==
                                                  self.data_type.base_type):
+            # Can't have multiple pointers to the same instance
+            if instance._referrer is not None:
+                raise ValueError(
+                    "Cannot have more than one pointer to an instance.")
+            
             # Unregister as a parent of the previous instance.
             if self._deref is not None:
-                self._deref._parents.remove(self)
+                self._deref._referrer = None
             
             # The instance is of the correct type, keep it
             self._deref = instance
-            self._deref._parents.append(self)
+            self._deref._referrer = self
         else:
             # The instance is not of an appropriate type. Fail.
             raise TypeError("pointer is for type {} but got {}".format(
@@ -227,13 +232,18 @@ class PointerInstance(Instance):
         else:
             return str(self.deref)
 
-    def iter_references(self, _generated=None):
+    def iter_instances(self, _generated=None):
         if _generated is None:
             _generated = set()
         
-        # This instance references the instance being pointed at (unless NULL).
-        if self not in _generated and self.deref is not None:
-            yield self.deref
-            
-            for ref in self.deref.iter_references(_generated):
+        if self not in _generated:
+            # Iterate over this instance as usual (this will add self to
+            # _generated).
+            for ref in super(PointerInstance, self).iter_instances(_generated):
                 yield ref
+            
+            # Then iterate over the pointed-to value
+            if self.deref is not None:
+                for ref in self.deref.iter_instances(_generated):
+                    yield ref
+            

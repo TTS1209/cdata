@@ -12,6 +12,8 @@ from cdata.complex_base import ComplexType, ComplexTypeInstance
 
 from cdata.endianness import Endianness
 
+from mock_container import container
+
 class Foo(ComplexType):
     """Define an example complex type for the purposes of these tests."""
     
@@ -155,7 +157,7 @@ def test_anonymous():
                                   # Names used by the base type
                                   "data_type",
                                   "literal",
-                                  "iter_references",
+                                  "iter_instances",
                                  ])
 def test_reserved_names(name):
     # Test that some names are not allowed
@@ -221,7 +223,7 @@ def test_instance():
                          "    '\\x00',\n"
                          "    0\n"
                          "}")
-    assert list(f.iter_references()) == []
+    assert list(f.iter_instances()) == [f]
     assert str(f) == "{a: b'\\x00', b: 0}"
     assert repr(f) == "<foo my_foo: {a: b'\\x00', b: 0}>"
     
@@ -230,9 +232,28 @@ def test_instance():
     f.unpack(b"foo")  # From FooInstance
 
 
-def test_iter_references_with_pointers():
+def test_one_container_per_entity():
+    foo = Foo("foo", ("a", char))
+    
+    c = char()
+    f0 = foo(c)
+    
+    # Shouldn't be able to put an instance in another container when it is
+    # already in a container.
+    with pytest.raises(ValueError):
+        foo(c)
+    f1 = foo()
+    with pytest.raises(ValueError):
+        f1.a = c
+    
+    # Should be able to after replacing the index in the orignal container
+    f0.a = char()
+    f1.a = c
+
+
+def test_iter_instances_with_pointers():
     # If some members are pointers, their destinations should be listed amongst
-    # the references.
+    # the instance iterator's output.
     c = char()
     uc = unsigned_char()
     
@@ -249,7 +270,7 @@ def test_iter_references_with_pointers():
     
     f = pointy_foo(c=Pointer(char)(c),
                    d=Pointer(unsigned_char)(uc))
-    assert list(f.iter_references()) == [c, uc]
+    assert list(f.iter_instances()) == [f, c, uc]
 
 
 
@@ -323,7 +344,7 @@ def test_nested():
     with pytest.raises(ValueError):
         my_foo(char(), anon_foo(), b__ba=char())
 
-def test_container():
+def test_container(container):
     # Test that the object forwards value change events from all members, but
     # not members' address changes.
     my_foo = Foo("my_foo",
@@ -331,31 +352,44 @@ def test_container():
                  ("b", unsigned_char))
     
     f = my_foo()
-    container = Mock()
-    f._parents.append(container)
+    referrer = Mock()
+    f._container = container
+    f._referrer = referrer
     
     # Changing the children should cause events
     f.a.value = b"a"
     container._child_value_changed.assert_called_once_with(f)
+    referrer._child_value_changed.assert_called_once_with(f)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     f.b.value = 123
     container._child_value_changed.assert_called_once_with(f)
+    referrer._child_value_changed.assert_called_once_with(f)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     
     # Changing an instance should cause events too
     old_a = f.a
     f.a = char(b"J")
     container._child_value_changed.assert_called_once_with(f)
+    referrer._child_value_changed.assert_called_once_with(f)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     
     # ...and should have stopped us responding to the old instance
     old_a.value = b"X"
     assert not container._child_value_changed.called
+    assert not referrer._child_value_changed.called
     
     # Changing child addresses should be ignored
     f.a.address = 0xDEADBEEF
     assert not container._child_address_changed.called
+    assert not referrer._child_address_changed.called
     
     # Changing the main address should cause a callback
     f.address = 0xDEADBEEF
     container._child_address_changed.assert_called_once_with(f)
+    referrer._child_address_changed.assert_called_once_with(f)
+    
+    # If the type is contained, it should not list itself
+    assert list(f.iter_instances()) == [container]

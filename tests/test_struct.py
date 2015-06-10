@@ -8,6 +8,8 @@ from cdata.primitive import char, unsigned_char
 
 from cdata.endianness import Endianness
 
+from mock_container import container
+
 def test_struct():
     struct_test = Struct("test",
                          ("a", char),
@@ -38,6 +40,7 @@ def test_struct():
                          "    'J',\n"
                          "    255\n"
                          "}")
+    assert list(t.iter_instances()) == [t]
     assert str(t) == "{a: b'J', b: 255}"
     assert repr(t) == "<struct test: {a: b'J', b: 255}>"
     
@@ -104,38 +107,51 @@ def test_struct():
         assert t.b.value == 0xAA
 
 
-def test_container():
+def test_container(container):
     struct_test = Struct("test",
                          ("a", char),
                          ("b", unsigned_char))
     s = struct_test()
     
-    container = Mock()
-    s._parents.append(container)
+    referrer = Mock()
+    s._container = container
+    s._referrer = referrer
     
     # Changing the address should cause a callback
     s.address = 0xDEADBEEF
     container._child_address_changed.assert_called_once_with(s)
+    referrer._child_address_changed.assert_called_once_with(s)
     container._child_address_changed.reset_mock()
+    referrer._child_address_changed.reset_mock()
     
     # Changing a struct member's address shouldn't
     s.a.address = 0xDEADBEEF
     assert not container._child_address_changed.called
+    assert not referrer._child_address_changed.called
     
     # Changing a struct member's value should cause a callback
     s.a.value = b"J"
     container._child_value_changed.assert_called_once_with(s)
+    referrer._child_value_changed.assert_called_once_with(s)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     
     # As should changing the instance
     s.a = char(b"J")
     container._child_value_changed.assert_called_once_with(s)
+    referrer._child_value_changed.assert_called_once_with(s)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     
     # As should unpacking
     s.unpack(b"\0\0")
     container._child_value_changed.assert_called_once_with(s)
+    referrer._child_value_changed.assert_called_once_with(s)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
+    
+    # Should get a reference to the container when iterating over instances.
+    assert list(s.iter_instances()) == [container]
 
 def test_documented():
     struct_test = Struct("test",

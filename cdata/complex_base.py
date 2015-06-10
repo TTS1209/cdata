@@ -231,13 +231,18 @@ class ComplexTypeInstance(Instance):
         This function will always be called with a valid member name and
         instance type.
         """
+        # Make sure the new instance isn't already contained by something else.
+        if instance._container is not None:
+            raise ValueError("The instance provided is already a member of "
+                             "another container.")
+        
         # If replacing an existing member, record that we are no-longer its
         # parent.
         if self._member_instances.get(name, None) is not None:
-            self._member_instances[name]._parents.remove(self)
+            self._member_instances[name]._container = None
         
         self._member_instances[name] = instance
-        instance._parents.append(self)
+        instance._container = self
         
         self._child_value_changed(instance)
     
@@ -270,15 +275,22 @@ class ComplexTypeInstance(Instance):
                 "{}\n"
                 "}}").format(self.data_type.name, indent(member_literals))
 
-    def iter_references(self, _generated=None):
+    def iter_instances(self, _generated=None):
         if _generated is None:
             _generated = set()
         
-        # Iterate over any references in members (complex types don't inherently
-        # reference anything so no need to list anything else).
-        for instance in itervalues(self._member_instances):
-            for ref in instance.iter_references(_generated):
+        if self not in _generated:
+            # Iterate over this instance as usual (this will add self to
+            # _generated).
+            for ref in super(ComplexTypeInstance, self).iter_instances(_generated):
                 yield ref
+            
+            # Then iterate over the members (which notably will not list
+            # themselves since they are contained by this instance, but rather
+            # will include anything they reference).
+            for instance in itervalues(self._member_instances):
+                for ref in instance.iter_instances(_generated):
+                    yield ref
 
     def __str__(self):
         return "{{{}}}".format(

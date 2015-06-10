@@ -4,7 +4,11 @@ from mock import Mock
 
 from cdata.array import Array, ArrayInstance
 
+from cdata.pointer import Pointer
+
 from cdata.primitive import unsigned_short, char
+
+from mock_container import container
 
 def test_array():
     # Check the type behaves as expected
@@ -31,7 +35,7 @@ def test_array():
     assert a[0].value == 0x1111
     assert a[1].value == 0x2222
     assert a[2].value == 0x3333
-    assert list(a.iter_references()) == []
+    assert list(a.iter_instances()) == [a]
     assert str(a) == "[4369, 8738, 13107]"
     assert repr(a) == "<unsigned short[3]: [4369, 8738, 13107]>"
     
@@ -103,6 +107,23 @@ def test_array():
     assert a[2].value == 0x90AB
     assert a[2].address is None
 
+def test_pointers_iter_instances():
+    # When we have an array of pointers, the pointer's referred values should be
+    # iterated over
+    c0 = char()
+    c1 = char()
+    c2 = char()
+    
+    charp3 = Array(Pointer(char), 3)
+    
+    a = charp3()
+    assert list(a.iter_instances()) == [a]
+    
+    a[0].deref = c0
+    a[1].deref = c1
+    a[2].deref = c2
+    assert list(a.iter_instances()) == [a, c0, c1, c2]
+
 def test_type_check():
     # Shouldn't be able to initialise with or set the wrong types
     ushort3 = Array(unsigned_short, 3)
@@ -154,7 +175,7 @@ def test_zero_length():
     assert a.literal == "{}"
     assert a.pack() == b""
     a.unpack(b"")
-    assert list(a.iter_references()) == []
+    assert list(a.iter_instances()) == [a]
     assert str(a) == "[]"
     assert repr(a) == "<unsigned short[0]: []>"
     
@@ -164,22 +185,22 @@ def test_zero_length():
     assert len(a) == 0
     assert list(a) == []
 
-def test_container():
+def test_container(container):
     ushort3 = Array(unsigned_short, 3)
     
     # Make sure the array sets up the _parents field of all members on
     # initialisation.
     a0 = unsigned_short(0x1234)
     a = ushort3([a0])
-    assert a in a0._parents
-    assert a in a[0]._parents
-    assert a in a[1]._parents
-    assert a in a[2]._parents
+    assert a is a0._container
+    assert a is a[0]._container
+    assert a is a[1]._container
+    assert a is a[2]._container
     
     # Make sure on instance replacement the parents field is updated
     a[0] = unsigned_short(0xBEEF)
-    assert a not in a0._parents
-    assert a in a[0]._parents
+    assert a is not a0._container
+    assert a is a[0]._container
     
     # Make sure the parent isn't removed if the instance isn't replaced (e.g.
     # due to type check failure)
@@ -187,32 +208,45 @@ def test_container():
     with pytest.raises(TypeError):
         a[0] = char(b"F")
     assert a[0] is a0
-    assert a in a[0]._parents
+    assert a is a[0]._container
     
     # Make sure that child changes are reported by the parent
-    container = Mock()
-    a._parents.append(container)
+    referrer = Mock()
+    a._container = container
+    a._referrer = referrer
     
     a[0].value = 0x1111
     container._child_value_changed.assert_called_once_with(a)
+    referrer._child_value_changed.assert_called_once_with(a)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     
     # Assigning a new instance should also cause a value change
     a[0] = unsigned_short()
     container._child_value_changed.assert_called_once_with(a)
+    referrer._child_value_changed.assert_called_once_with(a)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     
     # So should unpacking (but only once)
     a.unpack(b"\0\0\0\0\0\0")
     container._child_value_changed.assert_called_once_with(a)
+    referrer._child_value_changed.assert_called_once_with(a)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     
     # Setting a child's address should not do anything since a child's address
     # cannot be changed.
     a[2].address = None
     assert not container._child_address_changed.called
+    assert not referrer._child_address_changed.called
 
     # Setting the address should result in a notification
     a.address = 0x1000
     container._child_address_changed.assert_called_once_with(a)
+    referrer._child_address_changed.assert_called_once_with(a)
     container._child_address_changed.reset_mock()
+    referrer._child_address_changed.reset_mock()
+    
+    # Should list the container type when iterating over types
+    assert list(a.iter_instances()) == [container]

@@ -6,6 +6,8 @@ from cdata import primitive
 
 from cdata.endianness import Endianness
 
+from mock_container import container
+
 
 class TestPrimitive(object):
     """Test the basic functions of the Primitive type."""
@@ -36,6 +38,7 @@ class TestPrimitive(object):
         assert inst.pack() == b"\x7B"
         inst.unpack(b"\xAB")
         assert inst.value == 171
+        assert list(inst.iter_instances()) == [inst]
         assert str(inst) == "171"
         assert repr(inst) == "<test_t: 171>"
     
@@ -62,14 +65,15 @@ class TestPrimitive(object):
                                      native=native)
         assert test_t.native == native
     
-    def test_container(self):
-        """Ensure any container is called whenever the value changes."""
+    def test_parent(self, container):
+        """Ensure any container/reference is called whenever the value changes."""
         test_t = primitive.Primitive("test_t", "B", default_value=123,
                                      cast=(lambda v: v))
         inst = test_t()
         
-        container = Mock()
-        inst._parents.append(container)
+        referrer = Mock()
+        inst._container = container
+        inst._referrer = referrer
         
         # Reading the address should not call the callback
         inst.address
@@ -79,28 +83,41 @@ class TestPrimitive(object):
         inst.address = 0xDEADBEEF
         container._child_address_changed.assert_called_once_with(inst)
         container._child_address_changed.reset_mock()
+        referrer._child_address_changed.assert_called_once_with(inst)
+        referrer._child_address_changed.reset_mock()
         
         inst.address = None
         container._child_address_changed.assert_called_once_with(inst)
         container._child_address_changed.reset_mock()
+        referrer._child_address_changed.assert_called_once_with(inst)
+        referrer._child_address_changed.reset_mock()
         
         # Reading the value should do nothing
         inst.value
         assert not container._child_value_changed.called
+        assert not referrer._child_value_changed.called
         
         # Packing the value should do nothing
         inst.pack()
         assert not container._child_value_changed.called
+        assert not referrer._child_value_changed.called
         
         # Setting the value should call the callback
         inst.value = 0
         container._child_value_changed.assert_called_once_with(inst)
         container._child_value_changed.reset_mock()
+        referrer._child_value_changed.assert_called_once_with(inst)
+        referrer._child_value_changed.reset_mock()
         
         # Unpacking the value should call the callback
         inst.unpack(b"\xFF")
         container._child_value_changed.assert_called_once_with(inst)
         container._child_value_changed.reset_mock()
+        referrer._child_value_changed.assert_called_once_with(inst)
+        referrer._child_value_changed.reset_mock()
+        
+        # Iterating over instances should list the container, not the instance
+        assert list(inst.iter_instances()) == [container]
 
 
 class TestStandardTypes(object):

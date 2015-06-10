@@ -128,6 +128,10 @@ class ArrayInstance(Instance):
             raise TypeError("array is for type {} but got {}".format(
                 self.data_type.base_type, repr(instance)))
         
+        # Check the instance isn't already in a container
+        if instance._container is not None:
+            raise ValueError("instance is already a member of a container")
+        
         # Set the element's address
         if self.address is None:
             instance.address = None
@@ -137,12 +141,12 @@ class ArrayInstance(Instance):
         # If there was previously an instance here, remove this array as its
         # container.
         if self._instances[key] is not None:
-            self._instances[key]._parents.remove(self)
+            self._instances[key]._container = None
         
         self._instances[key] = instance
         
         # We are now the instance's parent, add it to the list
-        instance._parents.append(self)
+        instance._container = self
         
         # The array has now been changed, inform any parents
         self._value_changed()
@@ -196,11 +200,20 @@ class ArrayInstance(Instance):
     def __str__(self):
         return "[{}]".format(", ".join(map(str, self._instances)))
     
-    def iter_references(self, _generated=None):
+    def iter_instances(self, _generated=None):
         if _generated is None:
             _generated = set()
         
-        for instance in self._instances:
-            for r in instance.iter_references(_generated):
-                yield r
+        if self not in _generated:
+            # Iterate over this instance as usual (this will add self to
+            # _generated).
+            for ref in super(ArrayInstance, self).iter_instances(_generated):
+                yield ref
+            
+            # Then iterate over the members (which notably will not list
+            # themselves since they are contained by this instance, but rather
+            # will include anything they reference).
+            for instance in self._instances:
+                for ref in instance.iter_instances(_generated):
+                    yield ref
 

@@ -10,6 +10,8 @@ from cdata.primitive import char, _Bool
 
 from cdata.exceptions import PointerToUndefinedMemoryAddress
 
+from mock_container import container
+
 def test_pointer():
     char_p = Pointer(char)
     
@@ -28,6 +30,27 @@ def test_pointer():
     assert c.data_type is char_p
     assert isinstance(c, PointerInstance)
 
+def test_owned():
+    # Make sure that only one pointer to a given instance can exist at once.
+    char_p = Pointer(char)
+    
+    c = char()
+    cp = char_p(c)
+    
+    assert cp.deref == c
+    
+    # Can't create a second pointer while the first is still valid
+    with pytest.raises(ValueError):
+        cp2 = char_p(c)
+    
+    assert cp.deref == c
+    
+    # Can create a pointer once the first is invalidated
+    cp.deref = None
+    cp2 = char_p(c)
+    assert cp2.deref == c
+
+
 
 def test_null():
     char_p = Pointer(char)
@@ -44,7 +67,7 @@ def test_null():
     assert c.pack() == b"\x00\x00\x00\x00"
     assert str(c) == "NULL"
     assert repr(c) == "<char*: NULL>"
-    assert list(c.iter_references()) == []
+    assert list(c.iter_instances()) == [c]
     
     # Check that assigning an address of 0 produces a null pointer too
     c = char_p(0)
@@ -87,8 +110,9 @@ def test_not_null():
     assert c.deref.data_type is char
     assert c.deref.value == char().value
     
-    # The pointer should reference the pointed-to value
-    assert list(c.iter_references()) == [c.deref]
+    # The pointer's instance iterator should include the pointer followed by its
+    # referenced instance.
+    assert list(c.iter_instances()) == [c, c.deref]
     
     # Check the standard features work when not-NULL.
     c.deref.value = b"J"
@@ -230,72 +254,107 @@ def test_double_pointer():
     # Should have an appropriate literal
     assert c.literal == "&&'J'"
     
-    # Should recursively list references
-    assert list(c.iter_references()) == [c.deref, c.deref.deref]
+    # Should recursively list referenced instances
+    assert list(c.iter_instances()) == [c, c.deref, c.deref.deref]
 
 
-def test_parent():
+def test_parent(container):
     # Make sure parent container/reference types get called when appropriate.
     char_p = Pointer(char)
     c = char_p(char())
     
-    container = Mock()
-    c._parents.append(container)
+    referrer = Mock()
+    c._container = container
+    c._referrer = referrer
     
     # Should not get informed on pointed-to value changes
     c.deref.value = b"J"
     assert not container._child_value_changed.mock_calls
+    assert not referrer._child_value_changed.mock_calls
     assert not container._child_address_changed.mock_calls
+    assert not referrer._child_address_changed.mock_calls
     
     # Should get informed when the pointer's address is changed
     c.ref = 0xDEADBEEF
     container._child_value_changed.assert_called_once_with(c)
+    referrer._child_value_changed.assert_called_once_with(c)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     assert not container._child_address_changed.mock_calls
+    assert not referrer._child_address_changed.mock_calls
     
     # Should get informed when the child's address changes
     c.deref.address = 0x12345678
     container._child_value_changed.assert_called_once_with(c)
+    referrer._child_value_changed.assert_called_once_with(c)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     assert not container._child_address_changed.mock_calls
+    assert not referrer._child_address_changed.mock_calls
     
     # Should get informed when child gets nulled-out
     c.ref = 0
     container._child_value_changed.assert_called_once_with(c)
+    referrer._child_value_changed.assert_called_once_with(c)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     assert not container._child_address_changed.mock_calls
+    assert not referrer._child_address_changed.mock_calls
     
     # Should get informed when child gets swapped
     c.deref = char()
     container._child_value_changed.assert_called_once_with(c)
+    referrer._child_value_changed.assert_called_once_with(c)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     assert not container._child_address_changed.mock_calls
+    assert not referrer._child_address_changed.mock_calls
     
     # Should get informed when child gets indirectly nulled-out
     c.deref.address = 0
     container._child_value_changed.assert_called_once_with(c)
+    referrer._child_value_changed.assert_called_once_with(c)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     assert not container._child_address_changed.mock_calls
+    assert not referrer._child_address_changed.mock_calls
     
     # Nulling out a pointer should stop its instance causing change
     # notifications.
     my_char = char()
     c.deref = my_char
     container._child_value_changed.assert_called_once_with(c)
+    referrer._child_value_changed.assert_called_once_with(c)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     assert not container._child_address_changed.mock_calls
+    assert not referrer._child_address_changed.mock_calls
     my_char.address = 0x1234
     container._child_value_changed.assert_called_once_with(c)
+    referrer._child_value_changed.assert_called_once_with(c)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     assert not container._child_address_changed.mock_calls
+    assert not referrer._child_address_changed.mock_calls
     my_char.address = 0
     container._child_value_changed.assert_called_once_with(c)
+    referrer._child_value_changed.assert_called_once_with(c)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     assert not container._child_address_changed.mock_calls
+    assert not referrer._child_address_changed.mock_calls
     my_char.address = 0x1234
     assert not container._child_value_changed.mock_calls
+    assert not referrer._child_value_changed.mock_calls
     assert not container._child_address_changed.mock_calls
+    assert not referrer._child_address_changed.mock_calls
     
     # Should get informed of address changes as usual
     c.address = 0xDEADBEEF
     container._child_address_changed.assert_called_once_with(c)
+    referrer._child_address_changed.assert_called_once_with(c)
+    
+    # Giving the pointer a parent should prevent it being listed by
+    # iter_instances but shouldn't prevent its child being listed.
+    c.deref = char()
+    assert list(c.iter_instances()) == [container, c.deref]

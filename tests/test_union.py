@@ -8,6 +8,8 @@ from cdata.primitive import unsigned_char, unsigned_short
 
 from cdata.endianness import Endianness
 
+from mock_container import container
+
 def test_union():
     union_test = Union("test",
                        ("a", unsigned_char),
@@ -40,6 +42,7 @@ def test_union():
                          "    123,\n"
                          "    123\n"
                          "}")
+    assert list(t.iter_instances()) == [t]
     assert str(t) == "{a: 123, b: 123}"
     assert repr(t) == "<union test: {a: 123, b: 123}>"
     
@@ -214,38 +217,51 @@ def test_union_behaviour(endianness, a, b,
                 t.unpack(packed_data, endianness=wrong_endianness)
 
 
-def test_container():
+def test_container(container):
     union_test = Union("test",
                         ("a", unsigned_char),
                         ("b", unsigned_short))
     s = union_test()
     
-    container = Mock()
-    s._parents.append(container)
+    referrer = Mock()
+    s._container = container
+    s._referrer = referrer
     
     # Changing the address should cause a callback
     s.address = 0xDEADBEEF
     container._child_address_changed.assert_called_once_with(s)
+    referrer._child_address_changed.assert_called_once_with(s)
     container._child_address_changed.reset_mock()
+    referrer._child_address_changed.reset_mock()
     
     # Changing a union member's address shouldn't
     s.a.address = 0xDEADBEEF
     assert not container._child_address_changed.called
+    assert not referrer._child_address_changed.called
     
     # Changing a union member's value should cause a callback 
     s.a.value = 123
     container._child_value_changed.assert_called_once_with(s)
+    referrer._child_value_changed.assert_called_once_with(s)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     
     # As should changing the instance
     s.a = unsigned_char()
     container._child_value_changed.assert_called_once_with(s)
+    referrer._child_value_changed.assert_called_once_with(s)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     
     # As should unpacking
     s.unpack(b"\0\0")
     container._child_value_changed.assert_called_once_with(s)
+    referrer._child_value_changed.assert_called_once_with(s)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
+    
+    # Should return just the container when iterated over
+    assert list(s.iter_instances()) == [container]
 
 
 def test_nested():

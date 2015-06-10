@@ -6,6 +6,8 @@ from cdata.enum import Enum, EnumInstance
 
 from cdata.endianness import Endianness
 
+from mock_container import container
+
 def test_enum_named():
     # Test the basic data type features work as expected for named enums.
     my_enum = Enum("my_enum",
@@ -201,6 +203,7 @@ def test_enum_instance():
     assert e.address is 0xDEADBEEF
     assert e.size == 4
     assert e.literal == "ONE"
+    assert list(e.iter_instances()) == [e]
     assert str(e) == "ONE"
     assert repr(e) == "<enum my_enum: ONE>"
     
@@ -250,7 +253,7 @@ def test_enum_instance():
         e.value = "FOUR"
 
 
-def test_container():
+def test_parents(container):
     # Test that enum instances inform their container when changed
     my_enum = Enum("my_enum",
                    ("ONE", 1),
@@ -258,20 +261,30 @@ def test_container():
                    ("THREE", 3))
     
     e = my_enum()
-    container = Mock()
-    e._parents.append(container)
+    referrer = Mock()
+    e._container = container
+    e._referrer = referrer
     
     # Assignment should trigger a callback
     e.value = "TWO"
     container._child_value_changed.assert_called_once_with(e)
+    referrer._child_value_changed.assert_called_once_with(e)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     
     # Unpacking should trigger a callback
     e.unpack(b"\x01\0\0\0")
     container._child_value_changed.assert_called_once_with(e)
+    referrer._child_value_changed.assert_called_once_with(e)
     container._child_value_changed.reset_mock()
+    referrer._child_value_changed.reset_mock()
     
     # Changing address should trigger a callback
     e.address = 0xDEADBEEF
     container._child_address_changed.assert_called_once_with(e)
+    referrer._child_address_changed.assert_called_once_with(e)
     container._child_address_changed.reset_mock()
+    referrer._child_address_changed.reset_mock()
+    
+    # Check iteration lists only the container
+    assert list(e.iter_instances()) == [container]

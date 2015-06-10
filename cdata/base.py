@@ -154,9 +154,10 @@ class Instance(object):
     property which automatically calls the :py:meth:`._child_address_changed`
     method when the address is set.
     
-    Container and reference instances should add themselves to the instance._parents list
-    attribute of any direct children. They should remove themselves when they
-    nolonger contain/refer to the specified instance.
+    Container and reference instances should add themselves to their
+    member's/referee instance's _container or _referrer respectively.  They
+    should remove themselves when they no longer contain/refer to the specified
+    instance.
     
     Attributes
     ----------
@@ -168,12 +169,20 @@ class Instance(object):
         The size (in bytes) of the C representation of this instance.
     literal : str
         A C-literal which has the same value as this instance.
-    _parents : [:py:class:`Instance`, ...]
-        For internal use. A list of all instances which are parents to this
-        node. Used by the :py:meth:`._address_changed` and
+    _container : :py:class:`Instance` or None
+        For internal use. The container instance which directly contains this
+        instance or None if this instance is not in a container.
+        
+        Used by the :py:meth:`._address_changed` and
         :py:meth:`._value_changed` methods to call all parents'
         :py:meth:`._child_value_changed` and :py:meth:`._child_address_changed`
-        methods.
+        methods and also used to implement iter_instances.
+    _referrer : :py:class:`Instance` or None
+        Similar to _container except indicates which, if any, instance directly
+        refers to this instance (e.g. a pointer). This has the side-effect that
+        only one pointer may exist to a given value at any given time.
+        
+        This is not considered by the iter_instances method.
     """
     
     # Placed here so that these names appear in the dir() of this class to allow
@@ -183,13 +192,15 @@ class Instance(object):
     # reserved are known.
     data_type = None
     _address = None
-    _parents = empty_iterable
+    _container = None
+    _referrer = None
     
     def __init__(self, data_type):
         """Create a new instance of the specified type."""
         self.data_type = data_type
         self.address = None
-        self._parents = []
+        self._container = None
+        self._referrer = None
     
     @property
     def address(self):
@@ -253,23 +264,52 @@ class Instance(object):
         """
         raise NotImplementedError()
     
-    def iter_references(self, _generated=None):
-        """Iterate over all instances this instance refers to (excluding the
-        instance itself).
+    def iter_instances(self, _generated=None):
+        """Iterate over all instances in any way related to this instance.
         
-        The iterator iterates in an order such that any instances which are
-        referred to 
+        The purpose of this iterator is to give the caller a full list of all
+        the instances which form a common data-structure in order to either
+        allocate non-overlapping memory addresses or to facilitate the packing
+        of all related pieces of the structure without having to manually
+        specify each one.
+        
+        This iterator will only list "top-level" instances, i.e. instances which
+        don't reside in a container (e.g. a Struct or Array). This means that if
+        you have defined a struct, only the struct instance will be listed, the
+        struct members are not (since when the struct is packed, all its members
+        will be included). This iterator will also list any referenced
+        instances, for example calling iter_instances on a Pointer will produce
+        the pointer instance (or its container) along with the instance being
+        pointed to (or its container).
         
         Parameters
         ----------
-        _generated : set([:py:class:`DataType`, ...]) or None
-            For internal use only. If :py:meth:`.iter_references` is called on a
-            DataType which is listed in the _generated set, this generator
-            should generate no values.
+        _generated : set([:py:class:`Instance`, ...]) or None
+            For internal use only. If :py:meth:`.iter_instances` is called on an
+            instance which is listed in the _generated set, the generator
+            should terminate immediately.
         """
-        # A sensible (empty) iterator for types which don't contain other types.
-        if False:  # pragma: no branch
-            yield  # pragma: no cover
+        # This default implementation is sufficient for non-container and
+        # non-reference types. Containers and reference types should extend this
+        # method so that it also iterates over their members/referred instances.
+        
+        if _generated is None:
+            _generated = set()
+        
+        # Don't generate this instance multiple times
+        if self in _generated:
+            return
+        else:
+            _generated.add(self)
+        
+        if not self._container:
+            # If this instance is a top-level instance, produce itself
+            yield self
+        else:
+            # This instance is in a container, list the container's instances
+            # instead.
+            for i in self._container.iter_instances(_generated):
+                yield i
     
     def __str__(self):
         """Produce a human-readable version of the value of this instance."""
@@ -281,13 +321,17 @@ class Instance(object):
     
     def _value_changed(self):
         """To be called when an instances' value is changed."""
-        for p in self._parents:
-            p._child_value_changed(self)
+        if self._container is not None:
+            self._container._child_value_changed(self)
+        if self._referrer is not None:
+            self._referrer._child_value_changed(self)
     
     def _address_changed(self):
         """To be called when an instances' address is changed."""
-        for p in self._parents:
-            p._child_address_changed(self)
+        if self._container is not None:
+            self._container._child_address_changed(self)
+        if self._referrer is not None:
+            self._referrer._child_address_changed(self)
     
     def _child_value_changed(self, child):
         """Called for containers when a child's value changes."""

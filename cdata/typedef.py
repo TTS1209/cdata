@@ -49,7 +49,8 @@ class TypedefInstance(Instance):
         
         # We act like a container since when reporting changes, the reported
         # instance must be the typedef instance and not the base instance.
-        self._base_instance._parents.append(self)
+        assert self._base_instance._container is None
+        self._base_instance._container = self
     
     @property
     def literal(self):
@@ -67,6 +68,7 @@ class TypedefInstance(Instance):
     OVERRIDDEN_MEMBERS = set([
         "data_type",
         "literal",
+        "iter_instances",
     ])
     
     def __getattribute__(self, attr):
@@ -97,9 +99,9 @@ class TypedefInstance(Instance):
     def __new__(cls, typedef, *args, **kwargs):
         """Set up the TypedefInstance such that it wraps all special functions
         of the wrapped type."""
-        # First create subclass off the TypedefInstance since we need to modify
+        # First create subclass of the TypedefInstance since we need to modify
         # it to include the wrapped special methods
-        cls = type(cls.__name__, (cls, ), {})
+        cls = type(cls.__name__, (TypedefInstance, ), {})
         
         # Create the base type instance and embed a reference to it in the class
         cls._base_instance = typedef.base_type(*args, **kwargs)

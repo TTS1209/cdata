@@ -6,6 +6,8 @@ from cdata.typedef import Typedef, TypedefInstance
 
 from cdata.primitive import char
 
+from mock_container import container
+
 def test_typedef():
     char_t = Typedef("char_t", char)
     
@@ -30,6 +32,7 @@ def test_typedef():
     assert isinstance(c, TypedefInstance)
     assert c.data_type is char_t
     assert c.literal == "(char_t)'\\x00'"
+    assert list(c.iter_instances()) == [c]
     
     # Check that standard values pass through
     assert c.address is None
@@ -42,20 +45,34 @@ def test_typedef():
     # Check the instance remains of the correct type after unpacking
     c.unpack(b"\x12")
     assert c.value == b"\x12"
+
+def test_parents(container):
+    # Check that if the typedef is in a container or is referenced, the calls
+    # are passed through correctly and that they give the typedef's instance,
+    # not the underlying base type.
+    char_t = Typedef("char_t", char)
+    c = char_t()
     
-    # Check that if _parents is set, the calls are passed through correctly and
-    # that they give the typedef's instance, not the underlying base type.
-    container = Mock()
-    c._parents.append(container)
+    referrer = Mock()
+    c._container = container
+    c._referrer = referrer
+    
     c.value = b"J"
     c.address = 0xDEADBEEF
     assert len(container._child_value_changed.call_args_list) == 1
+    assert len(referrer._child_value_changed.call_args_list) == 1
     child = container._child_value_changed.call_args_list[0][0][0]
+    child = referrer._child_value_changed.call_args_list[0][0][0]
     assert child is c
     
     assert len(container._child_address_changed.call_args_list) == 1
+    assert len(referrer._child_address_changed.call_args_list) == 1
     child = container._child_address_changed.call_args_list[0][0][0]
+    child = referrer._child_address_changed.call_args_list[0][0][0]
     assert child is c
+    
+    # Should iterate over the container, not the instance
+    assert list(c.iter_instances()) == [container]
 
 
 def test_typedef_documented():
